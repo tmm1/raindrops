@@ -27,7 +27,7 @@ Gem::Specification.new do |s|
 
   s.files = manifest
   s.homepage = %q{http://raindrops.bogomips.org/}
-  s.summary = %q{real-time stats for Rack servers}
+  s.summary = %q{real-time stats for preforking Rack servers}
   s.rdoc_options = [ "-Na", "-t", "raindrops - #{s.summary}" ]
   s.require_paths = %w(lib)
   s.rubyforge_project = %q{raindrops}
