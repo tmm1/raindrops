@@ -1,0 +1,2 @@
+* more portable atomics for non-GCC systems (libatomicops?)
+* pure Ruby version for non-forking servers
