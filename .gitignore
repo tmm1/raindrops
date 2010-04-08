@@ -8,7 +8,6 @@ Makefile
 /NEWS
 /ChangeLog
 /.manifest
-/GIT-VERSION-FILE
 /man
 /pkg
 /doc
