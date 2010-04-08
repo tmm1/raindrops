@@ -5,7 +5,8 @@ module Linux
   # The standard proc path for active UNIX domain sockets, feel free to call
   # String#replace on this if your /proc is mounted in a non-standard location
   # for whatever reason
-  PROC_NET_UNIX = "/proc/net/unix"
+  PROC_NET_UNIX_ARGS = %w(/proc/net/unix)
+  defined?(::Encoding) and PROC_NET_UNIX_ARGS.push({ :encoding => "binary" })
 
   # Get ListenStats from an array of +paths+
   #
@@ -36,13 +37,11 @@ module Linux
     paths = / 00000000 \d+ (\d+)\s+\d+ (#{paths.join('|')})$/n
 
     # no point in pread since we can't stat for size on this file
-    File.open(PROC_NET_UNIX, "rb") do |fp|
-      fp.read.scan(paths).each do |s|
-        path = s.last
-        case s.first.to_i
-        when 2 then rv[path].queued += 1
-        when 3 then rv[path].active += 1
-        end
+    File.read(*PROC_NET_UNIX_ARGS).scan(paths) do |s|
+      path = s.last
+      case s.first.to_i
+      when 2 then rv[path].queued += 1
+      when 3 then rv[path].active += 1
       end
     end
 
