@@ -30,7 +30,7 @@ Gem::Specification.new do |s|
   s.summary = %q{real-time stats for preforking Rack servers}
   s.rdoc_options = [ "-Na", "-t", "raindrops - #{s.summary}" ]
   s.require_paths = %w(lib)
-  s.rubyforge_project = %q{raindrops}
+  s.rubyforge_project = %q{rainbows}
 
   s.test_files = test_files
 
