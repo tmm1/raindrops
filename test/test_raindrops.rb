@@ -80,7 +80,7 @@ class TestRaindrops < Test::Unit::TestCase
   end
 
   def test_big
-    expect = 256.times.map { 0 }
+    expect = (1..256).map { 0 }
     rd = Raindrops.new(256)
     assert_equal expect, rd.to_ary
     assert_nothing_raised { rd[255] = 5 }

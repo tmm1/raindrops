@@ -138,7 +138,7 @@ class TestLinux < Test::Unit::TestCase
       fork do
         rda.close
         wrb.close
-        socks = nr_sock.times.map { s.accept }
+        socks = (1..nr_sock).times.map { s.accept }
         wra.syswrite('.')
         wra.close
         rdb.sysread(1) # wait for parent to nuke us
@@ -149,7 +149,7 @@ class TestLinux < Test::Unit::TestCase
       fork do
         rda.close
         wrb.close
-        socks = nr_sock.times.map { TCPSocket.new(TEST_ADDR, port) }
+        socks = (1..nr_sock).times.map { TCPSocket.new(TEST_ADDR, port) }
         wra.syswrite('.')
         wra.close
         rdb.sysread(1) # wait for parent to nuke us
