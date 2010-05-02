@@ -2,6 +2,7 @@
 all::
 RUBY = ruby
 RAKE = rake
+RSYNC = rsync
 GIT_URL = git://git.bogomips.org/raindrops.git
 
 GIT-VERSION-FILE: .FORCE-GIT-VERSION-FILE
@@ -48,6 +49,9 @@ manifest: $(pkg_extra)
 NEWS: GIT-VERSION-FILE
 	$(RAKE) -s news_rdoc > $@+
 	mv $@+ $@
+
+latest: NEWS
+	@awk 'BEGIN{RS="=== ";ORS=""}NR==2{sub(/\n$$/,"");print RS""$$0 }' $<
 
 SINCE =
 ChangeLog: LOG_VERSION = \
@@ -168,5 +172,26 @@ test: test-unit
 test-unit: $(test_units)
 $(test_units): build
 	$(RUBY) -I lib:ext/raindrops $@
+
+# this requires GNU coreutils variants
+publish_doc:
+	-git set-file-times
+	$(RM) -r doc ChangeLog NEWS
+	$(MAKE) doc LOG_VERSION=$(shell git tag -l | tail -1)
+	$(MAKE) -s latest > doc/LATEST
+	find doc/images doc/js -type f | \
+		TZ=UTC xargs touch -d '1970-01-01 00:00:00' doc/rdoc.css
+	$(MAKE) doc_gz
+	chmod 644 $$(find doc -type f)
+	$(RSYNC) -av doc/ raindrops.bogomips.org:/srv/raindrops/
+	git ls-files | xargs touch
+
+# Create gzip variants of the same timestamp as the original so nginx
+# "gzip_static on" can serve the gzipped versions directly.
+doc_gz: docs = $(shell find doc -type f ! -regex '^.*\.\(gif\|jpg\|png\|gz\)$$')
+doc_gz:
+	touch doc/NEWS.atom.xml -d "$$(awk 'NR==1{print $$4,$$5,$$6}' NEWS)"
+	for i in $(docs); do \
+	  gzip --rsyncable -9 < $$i > $$i.gz; touch -r $$i $$i.gz; done
 
 .PHONY: .FORCE-GIT-VERSION-FILE doc manifest man test $(test_units)
