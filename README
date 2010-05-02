@@ -115,3 +115,12 @@ don't email the git mailing list or maintainer with raindrops patches.
 
 All feedback (bug reports, user/development discussion, patches, pull
 requests) go to the mailing list: mailto:raindrops@librelist.com
+
+The mailing list is mirrored to Gmane, all information about the
+group is here:
+
+http://gmane.org/info.php?group=gmane.comp.lang.ruby.raindrops.general
+
+Mailing list archives in mbox format may be downloaded here:
+
+http://raindrops.bogomips.org/archives/
