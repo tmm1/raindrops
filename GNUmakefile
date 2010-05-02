@@ -67,10 +67,10 @@ cgit_atom := http://git.bogomips.org/cgit/raindrops.git/atom/?h=master
 atom = <link rel="alternate" title="Atom feed" href="$(1)" \
              type="application/atom+xml"/>
 
-# using rdoc 2.4.1+
+# using rdoc 2.5.x
 doc: .document NEWS ChangeLog
 	for i in $(man1_bins); do > $$i; done
-	rdoc -Na -t "$(shell sed -ne '1s/^= //p' README)"
+	rdoc -a -t "$(shell sed -ne '1s/^= //p' README)"
 	install -m644 COPYING doc/COPYING
 	install -m644 $(shell grep '^[A-Z]' .document) doc/
 	cd doc && for i in $(base_bins); do \
