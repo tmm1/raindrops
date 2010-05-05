@@ -26,7 +26,7 @@ class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
     end
   end
 
-  # standard Rack endpoing
+  # standard Rack endpoint
   def call(env)
     env[PATH_INFO] == path ? stats_response : dup._call(env)
   end

@@ -338,5 +338,5 @@ void Init_raindrops_linux_inet_diag(void)
 
 	page_size = getpagesize();
 
-	assert(OPLEN <= page_size && "bytecode OPLEN is no <= PAGE_SIZE");
+	assert(OPLEN <= page_size && "bytecode OPLEN is not <= PAGE_SIZE");
 }
