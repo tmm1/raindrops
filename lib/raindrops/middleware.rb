@@ -13,7 +13,12 @@ class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
 
   def initialize(app, opts = {})
     super(app, opts[:stats] || Stats.new, opts[:path] || "/_raindrops")
-    if tmp = opts[:listeners]
+    tmp = opts[:listeners]
+    if tmp.nil? && defined?(Unicorn) && Unicorn.respond_to?(:listener_names)
+      tmp = Unicorn.listener_names
+    end
+
+    if tmp
       self.tcp = tmp.grep(/\A[^:]+:\d+\z/)
       self.unix = tmp.grep(%r{\A/})
       self.tcp = nil if tcp.empty?
