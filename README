@@ -87,7 +87,11 @@ combination of TCP or Unix domain socket names:
 
         use Raindrops::Middleware, :listeners => %w(0.0.0.0:80 /tmp/.sock)
 
-See the tests/ and examples/ directory for more examples
+See the tests/ and examples/ directory for more examples.
+
+If you're running Unicorn 0.98.0 or later, you don't have to pass in
+the :listeners array, Raindrops will automatically detect the listeners
+used by Unicorn master process.
 
 == Development
 
