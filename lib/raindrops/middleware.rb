@@ -50,8 +50,7 @@ class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
   # the Rack server should call this after #each (usually ensure-d)
   def close
     stats.decr_writing
-    ensure
-      app.close if app.respond_to?(:close)
+    app.close if app.respond_to?(:close)
   end
 
   def stats_response
