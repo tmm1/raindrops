@@ -5,7 +5,7 @@
 
 require 'raindrops'
 require 'optparse'
-usage = "Usage: #$0 [--loop] ADDR..."
+usage = "Usage: #$0 [-d delay] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
 
