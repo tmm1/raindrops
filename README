@@ -115,6 +115,12 @@ git itself.  See the Documentation/SubmittingPatches document
 distributed with git on on patch submission guidelines to follow.  Just
 don't email the git mailing list or maintainer with raindrops patches.
 
+raindrops is currently dual-licensed under the LGPLv2.1 and LGPLv3.  To
+allow for a transition to future versions of the LGPL, contributors are
+required to sign-off changes allowing allowing the project leader to
+relicense raindrops under newer versions of the LGPL (which should be
+similar in spirit to the existing LGPL).
+
 == Contact
 
 All feedback (bug reports, user/development discussion, patches, pull

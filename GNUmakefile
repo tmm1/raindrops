@@ -53,7 +53,7 @@ NEWS: GIT-VERSION-FILE
 latest: NEWS
 	@awk 'BEGIN{RS="=== ";ORS=""}NR==2{sub(/\n$$/,"");print RS""$$0 }' $<
 
-SINCE = 0.1.0
+SINCE = 0.2.1
 ChangeLog: LOG_VERSION = \
   $(shell git rev-parse -q "$(GIT_VERSION)" >/dev/null 2>&1 && \
           echo $(GIT_VERSION) || git describe)
