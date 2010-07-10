@@ -181,6 +181,7 @@ publish_doc:
 	$(MAKE) -s latest > doc/LATEST
 	find doc/images doc/js -type f | \
 		TZ=UTC xargs touch -d '1970-01-01 00:00:00' doc/rdoc.css
+	tar cf - $$(git ls-files examples/) | (cd doc && tar xf -)
 	$(MAKE) doc_gz
 	chmod 644 $$(find doc -type f)
 	$(RSYNC) -av doc/ raindrops.bogomips.org:/srv/raindrops/
