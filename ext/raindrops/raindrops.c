@@ -75,6 +75,7 @@ retry:
 	r->drops = mmap(NULL, sizeof(struct raindrop) * r->size,
 	                PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
 	if (r->drops == MAP_FAILED) {
+		r->drops = NULL;
 		if ((errno == EAGAIN || errno == ENOMEM) && tries-- > 0) {
 			rb_gc();
 			goto retry;
