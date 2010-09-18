@@ -144,7 +144,7 @@ static VALUE diag(void *ptr)
 	} req;
 	struct msghdr msg;
 	const char *err = NULL;
-	unsigned seq = __sync_add_and_fetch(&g_seq, 1);
+	unsigned seq = ++g_seq; /* not atomic, rely on GVL for now */
 	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
 
 	if (fd < 0)

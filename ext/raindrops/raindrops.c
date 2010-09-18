@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
+#include "raindrops_atomic.h"
 
 /*
  * most modern CPUs have a cache-line size of 64 or 128.
