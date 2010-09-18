@@ -1,25 +1,25 @@
 #include <ruby.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
 #include "raindrops_atomic.h"
 
+#ifndef SIZET2NUM
+#  define SIZET2NUM(x) ULONG2NUM(x)
+#endif
+
 /*
  * most modern CPUs have a cache-line size of 64 or 128.
  * We choose a bigger one by default since our structure is not
  * heavily used
  */
-#ifndef CACHE_LINE_SIZE
-#  define CACHE_LINE_SIZE 128
-#endif
+static size_t raindrop_size = 128;
 
 /* each raindrop is a counter */
 struct raindrop {
-	union {
-		unsigned long counter;
-		unsigned char padding[CACHE_LINE_SIZE];
-	} as;
+	unsigned long counter;
 } __attribute__((packed));
 
 /* allow mmap-ed regions can store more than one raindrop */
@@ -34,7 +34,7 @@ static void evaporate(void *ptr)
 	struct raindrops *r = ptr;
 
 	if (r->drops) {
-		int rv = munmap(r->drops, sizeof(struct raindrop) * r->size);
+		int rv = munmap(r->drops, raindrop_size * r->size);
 		if (rv != 0)
 			rb_bug("munmap failed in gc: %s", strerror(errno));
 	}
@@ -73,7 +73,7 @@ static VALUE init(VALUE self, VALUE size)
 		rb_raise(rb_eArgError, "size must be >= 1");
 
 retry:
-	r->drops = mmap(NULL, sizeof(struct raindrop) * r->size,
+	r->drops = mmap(NULL, raindrop_size * r->size,
 	                PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
 	if (r->drops == MAP_FAILED) {
 		r->drops = NULL;
@@ -94,7 +94,7 @@ static VALUE init_copy(VALUE dest, VALUE source)
 	struct raindrops *src = get(source);
 
 	init(dest, LONG2NUM(src->size));
-	memcpy(dst->drops, src->drops, sizeof(struct raindrop) * src->size);
+	memcpy(dst->drops, src->drops, raindrop_size * src->size);
 
 	return dest;
 }
@@ -102,9 +102,9 @@ static VALUE init_copy(VALUE dest, VALUE source)
 static unsigned long *addr_of(VALUE self, VALUE index)
 {
 	struct raindrops *r = get(self);
-	unsigned long off = FIX2ULONG(index) * sizeof(struct raindrop);
+	unsigned long off = FIX2ULONG(index) * raindrop_size;
 
-	if (off >= sizeof(struct raindrop) * r->size)
+	if (off >= raindrop_size * r->size)
 		rb_raise(rb_eArgError, "offset overrun");
 
 	return (unsigned long *)((unsigned long)r->drops + off);
@@ -145,7 +145,7 @@ static VALUE to_ary(VALUE self)
 
 	for (i = 0; i < r->size; i++) {
 		rb_ary_push(rv, ULONG2NUM(*((unsigned long *)base)));
-		base += sizeof(struct raindrop);
+		base += raindrop_size;
 	}
 
 	return rv;
@@ -174,9 +174,34 @@ static VALUE aref(VALUE self, VALUE index)
 void Init_raindrops_linux_inet_diag(void);
 #endif
 
+#ifndef _SC_NPROCESSORS_ONLN
+#  ifdef _SC_NPROC_ONLN
+#    define _SC_NPROCESSORS_ONLN _SC_NPROC_ONLN
+#  elif defined _SC_CRAY_NCPU
+#    define _SC_NPROCESSORS_ONLN _SC_CRAY_NCPU
+#  endif
+#endif
+
 void Init_raindrops_ext(void)
 {
 	VALUE cRaindrops = rb_define_class("Raindrops", rb_cObject);
+	long tmp = 2;
+
+#ifdef _SC_NPROCESSORS_ONLN
+	tmp = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+	/* no point in padding on single CPU machines */
+	if (tmp == 1)
+		raindrop_size = sizeof(unsigned long);
+#ifdef _SC_LEVEL1_DCACHE_LINESIZE
+	if (tmp != 1) {
+		tmp = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+		if (tmp > 0)
+			raindrop_size = (size_t)tmp;
+	}
+#endif
+	rb_define_const(cRaindrops, "SIZE", SIZET2NUM(raindrop_size));
+
 	rb_define_alloc_func(cRaindrops, alloc);
 
 	rb_define_method(cRaindrops, "initialize", init, 1);

@@ -4,6 +4,12 @@ require 'raindrops'
 
 class TestRaindrops < Test::Unit::TestCase
 
+  def test_raindrop_size
+    assert_kind_of Integer, Raindrops::SIZE
+    assert Raindrops::SIZE > 0
+    puts "Raindrops::SIZE = #{Raindrops::SIZE}"
+  end
+
   def test_size
     rd = Raindrops.new(4)
     assert_equal 4, rd.size
