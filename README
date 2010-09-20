@@ -3,8 +3,7 @@
 Raindrops is a real time stats package to show statistics for Rack HTTP
 servers.  It is designed for preforking servers such as Rainbows! and
 Unicorn, but should support any Rack HTTP server under Ruby 1.9, 1.8 and
-possibly Rubinius (untested) on platforms supporting POSIX shared memory
-and compiled with GCC (for atomic builtins).
+possibly Rubinius (untested) on platforms supporting POSIX shared memory.
 
 Raindrops includes a Struct-like Raindrops::Struct class that may be used
 standalone to create atomic counters shared across any number of forked
@@ -35,9 +34,12 @@ processes under SMP.
 
 == Install
 
-raindrops requires GCC 4.x (or compatible) or later to support the
-atomic builtins (__sync_{add,sub}_and_fetch()).  Atomic operations on
-other compilers may be supported if there is demand.
+We recommend GCC 4+ (or compatible) to support the
+{atomic builtins}[http://gcc.gnu.org/onlinedocs/gcc/Atomic-Builtins.html]
+(__sync_{add,sub}_and_fetch()).  For non-GCC 4+ users, we also support
+compilation with the
+{libatomic_ops}[http://www.hpl.hp.com/research/linux/atomic_ops/]
+package starting with Raindrops 0.4.0.
 
 If you're using a packaged Ruby distribution, make sure you have a C
 compiler and the matching Ruby development libraries and headers.
