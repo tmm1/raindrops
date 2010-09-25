@@ -7,11 +7,13 @@
 #ifndef RSTRING_LEN
 #  define RSTRING_LEN(s) (RSTRING(s)->len)
 #endif
-#ifndef RSTRUCT_PTR
-#  define RSTRUCT_PTR(s) (RSTRUCT(s)->ptr)
-#endif
-#ifndef RSTRUCT_LEN
-#  define RSTRUCT_LEN(s) (RSTRUCT(s)->len)
+#ifdef RSTRUCT
+#  ifndef RSTRUCT_PTR
+#    define RSTRUCT_PTR(s) (RSTRUCT(s)->ptr)
+#   endif
+#  ifndef RSTRUCT_LEN
+#    define RSTRUCT_LEN(s) (RSTRUCT(s)->len)
+#  endif
 #endif
 
 #ifndef HAVE_RB_STRUCT_ALLOC_NOINIT
@@ -85,11 +87,17 @@ struct nogvl_args {
 static VALUE rb_listen_stats(struct listen_stats *stats)
 {
 	VALUE rv = rb_struct_alloc_noinit(cListenStats);
+	VALUE active = LONG2NUM(stats->active);
+	VALUE queued = LONG2NUM(stats->queued);
+
+#ifdef RSTRUCT_PTR
 	VALUE *ptr = RSTRUCT_PTR(rv);
-
-	ptr[0] = LONG2NUM(stats->active);
-	ptr[1] = LONG2NUM(stats->queued);
-
+	ptr[0] = active;
+	ptr[1] = queued;
+#else /* Rubinius */
+	rb_funcall(rv, rb_intern("active="), 1, active);
+	rb_funcall(rv, rb_intern("queued="), 1, queued);
+#endif /* ! Rubinius */
 	return rv;
 }
 
