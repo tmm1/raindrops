@@ -1,6 +1,5 @@
 require 'mkmf'
 
-# FIXME: test for GCC __sync_XXX builtins here, somehow...
 have_func('mmap', 'sys/mman.h') or abort 'mmap() not found'
 have_func('munmap', 'sys/mman.h') or abort 'munmap() not found'
 
@@ -18,6 +17,13 @@ int main(int argc, char * const argv[]) {
 SRC
 
   if try_run(src)
+    # some systems target GCC for i386 and don't get the atomic builtins
+    # when building shared objects
+    arch = `#{CONFIG['CC']} -dumpmachine`.split(/-/)[0]
+    if arch == "i386" && $CFLAGS !~ /\b-march=/
+      $CFLAGS += " -march=i486 "
+    end
+
     $defs.push(format("-DHAVE_GCC_ATOMIC_BUILTINS"))
     true
   else
