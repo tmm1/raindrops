@@ -1,4 +1,5 @@
 #include <ruby.h>
+#ifdef __linux__
 
 /* Ruby 1.8.6+ macros (for compatibility with Ruby 1.9) */
 #ifndef RSTRING_PTR
@@ -348,3 +349,4 @@ void Init_raindrops_linux_inet_diag(void)
 
 	assert(OPLEN <= page_size && "bytecode OPLEN is not <= PAGE_SIZE");
 }
+#endif /* __linux__ */
