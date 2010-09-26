@@ -3,7 +3,7 @@
 Raindrops is a real time stats package to show statistics for Rack HTTP
 servers.  It is designed for preforking servers such as Rainbows! and
 Unicorn, but should support any Rack HTTP server under Ruby 1.9, 1.8 and
-possibly Rubinius (untested) on platforms supporting POSIX shared memory.
+Rubinius on platforms supporting POSIX shared memory.
 
 Raindrops includes a Struct-like Raindrops::Struct class that may be used
 standalone to create atomic counters shared across any number of forked
