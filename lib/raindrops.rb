@@ -1,8 +1,8 @@
 # -*- encoding: binary -*-
 class Raindrops
 
-  # Raindrops is currently at version 0.4.0
-  VERSION = '0.4.0'
+  # Raindrops is currently at version 0.4.1
+  VERSION = '0.4.1'
 
   # Used to represent the number of +active+ and +queued+ sockets for
   # a single listen socket across all threads and processes on a
