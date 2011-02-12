@@ -320,7 +320,7 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 	args.iov[2].iov_base = alloca(page_size);
 
 	if (TYPE(addrs) != T_ARRAY)
-		rb_raise(rb_eArgError, "addrs must be an Array or String");
+		rb_raise(rb_eArgError, "addrs must be an Array of Strings");
 
 	rv = rb_hash_new();
 	ary = RARRAY_PTR(addrs);
