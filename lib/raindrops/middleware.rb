@@ -3,7 +3,8 @@ require 'raindrops'
 
 # Raindrops middleware should be loaded at the top of Rack
 # middleware stack before other middlewares for maximum accuracy.
-class Raindrops::Middleware < Struct.new(:app, :stats, :path, :tcp, :unix)
+class Raindrops::Middleware
+  attr_accessor :app, :stats, :path, :tcp, :unix
 
   # :stopdoc:
   Stats = Raindrops::Struct.new(:calling, :writing)
@@ -11,60 +12,63 @@ class Raindrops::Middleware < Struct.new(:app, :stats, :path, :tcp, :unix)
   # :startdoc:
 
   def initialize(app, opts = {})
-    super(app, opts[:stats] || Stats.new, opts[:path] || "/_raindrops")
+    @app = app
+    @stats = opts[:stats] || Stats.new
+    @path = opts[:path] || "/_raindrops"
     tmp = opts[:listeners]
     if tmp.nil? && defined?(Unicorn) && Unicorn.respond_to?(:listener_names)
       tmp = Unicorn.listener_names
     end
+    @tcp = @unix = nil
 
     if tmp
-      self.tcp = tmp.grep(/\A[^:]+:\d+\z/)
-      self.unix = tmp.grep(%r{\A/})
-      self.tcp = nil if tcp.empty?
-      self.unix = nil if unix.empty?
+      @tcp = tmp.grep(/\A[^:]+:\d+\z/)
+      @unix = tmp.grep(%r{\A/})
+      @tcp = nil if @tcp.empty?
+      @unix = nil if @unix.empty?
     end
   end
 
   # standard Rack endpoint
   def call(env)
-    env[PATH_INFO] == path ? stats_response : dup._call(env)
+    env[PATH_INFO] == @path ? stats_response : dup._call(env)
   end
 
   def _call(env)
-    stats.incr_calling
-    status, headers, self.app = app.call(env)
+    @stats.incr_calling
+    status, headers, @app = @app.call(env)
 
     # the Rack server will start writing headers soon after this method
-    stats.incr_writing
+    @stats.incr_writing
     [ status, headers, self ]
     ensure
-      stats.decr_calling
+      @stats.decr_calling
   end
 
   # yield to the Rack server here for writing
   def each
-    app.each { |x| yield x }
+    @app.each { |x| yield x }
   end
 
   # the Rack server should call this after #each (usually ensure-d)
   def close
-    stats.decr_writing
-    app.close if app.respond_to?(:close)
+    @stats.decr_writing
+    @app.close if @app.respond_to?(:close)
   end
 
   def stats_response
-    body = "calling: #{stats.calling}\n" \
-           "writing: #{stats.writing}\n"
+    body = "calling: #{@stats.calling}\n" \
+           "writing: #{@stats.writing}\n"
 
     if defined?(Raindrops::Linux)
-      Raindrops::Linux.tcp_listener_stats(tcp).each do |addr,stats|
+      Raindrops::Linux.tcp_listener_stats(@tcp).each do |addr,stats|
         body << "#{addr} active: #{stats.active}\n" \
                 "#{addr} queued: #{stats.queued}\n"
-      end if tcp
-      Raindrops::Linux.unix_listener_stats(unix).each do |addr,stats|
+      end if @tcp
+      Raindrops::Linux.unix_listener_stats(@unix).each do |addr,stats|
         body << "#{addr} active: #{stats.active}\n" \
                 "#{addr} queued: #{stats.queued}\n"
-      end if unix
+      end if @unix
     end
 
     headers = {
