@@ -3,8 +3,7 @@ require 'raindrops'
 
 # Raindrops middleware should be loaded at the top of Rack
 # middleware stack before other middlewares for maximum accuracy.
-class Raindrops
-class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
+class Raindrops::Middleware < Struct.new(:app, :stats, :path, :tcp, :unix)
 
   # :stopdoc:
   Stats = Raindrops::Struct.new(:calling, :writing)
@@ -57,12 +56,12 @@ class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
     body = "calling: #{stats.calling}\n" \
            "writing: #{stats.writing}\n"
 
-    if defined?(Linux)
-      Linux.tcp_listener_stats(tcp).each do |addr,stats|
+    if defined?(Raindrops::Linux)
+      Raindrops::Linux.tcp_listener_stats(tcp).each do |addr,stats|
         body << "#{addr} active: #{stats.active}\n" \
                 "#{addr} queued: #{stats.queued}\n"
       end if tcp
-      Linux.unix_listener_stats(unix).each do |addr,stats|
+      Raindrops::Linux.unix_listener_stats(unix).each do |addr,stats|
         body << "#{addr} active: #{stats.active}\n" \
                 "#{addr} queued: #{stats.queued}\n"
       end if unix
@@ -74,6 +73,4 @@ class Middleware < ::Struct.new(:app, :stats, :path, :tcp, :unix)
     }
     [ 200, headers, [ body ] ]
   end
-
-end
 end

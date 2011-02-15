@@ -1,6 +1,5 @@
 # -*- encoding: binary -*-
-class Raindrops
-module Linux
+module Raindrops::Linux
 
   # The standard proc path for active UNIX domain sockets, feel free to call
   # String#replace on this if your /proc is mounted in a non-standard location
@@ -27,7 +26,7 @@ module Linux
   # This parses /proc/net/unix as there is no other (known) way
   # to expose Unix domain socket statistics over netlink.
   def unix_listener_stats(paths)
-    rv = Hash.new { |h,k| h[k.freeze] = ListenStats.new(0, 0) }
+    rv = Hash.new { |h,k| h[k.freeze] = Raindrops::ListenStats.new(0, 0) }
     paths = paths.map do |path|
       path = path.dup
       path.force_encoding(Encoding::BINARY) if defined?(Encoding)
@@ -47,8 +46,6 @@ module Linux
 
     rv
   end
-
   module_function :unix_listener_stats
 
-end # Linux
-end # Raindrops
+end # Raindrops::Linux
