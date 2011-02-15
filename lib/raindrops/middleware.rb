@@ -42,8 +42,8 @@ class Raindrops::Middleware < Struct.new(:app, :stats, :path, :tcp, :unix)
   end
 
   # yield to the Rack server here for writing
-  def each(&block)
-    app.each(&block)
+  def each
+    app.each { |x| yield x }
   end
 
   # the Rack server should call this after #each (usually ensure-d)
