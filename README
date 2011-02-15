@@ -99,13 +99,13 @@ used by Unicorn master process.
 
 You can get the latest source via git from the following locations:
 
-  git://git.bogomips.org/raindrops.git
+  git://bogomips.org/raindrops.git
   git://repo.or.cz/raindrops.git (mirror)
 
 You may browse the code from the web and download the latest snapshot
 tarballs here:
 
-* http://git.bogomips.org/cgit/raindrops.git (cgit)
+* http://bogomips.org/raindrops.git (cgit)
 * http://repo.or.cz/w/raindrops.git (gitweb)
 
 Inline patches (from "git format-patch") to the mailing list are
