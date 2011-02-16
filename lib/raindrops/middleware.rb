@@ -22,7 +22,7 @@ class Raindrops::Middleware
     @tcp = @unix = nil
 
     if tmp
-      @tcp = tmp.grep(/\A[^:]+:\d+\z/)
+      @tcp = tmp.grep(/\A.+:\d+\z/)
       @unix = tmp.grep(%r{\A/})
       @tcp = nil if @tcp.empty?
       @unix = nil if @unix.empty?
