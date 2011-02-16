@@ -50,6 +50,7 @@ rb_thread_blocking_region(
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <netdb.h>
 #include <unistd.h>
 #include <string.h>
 #include <asm/types.h>
@@ -64,23 +65,18 @@ static size_t page_size;
 static unsigned g_seq;
 static VALUE cListenStats;
 
-struct my_addr {
-	in_addr_t addr;
-	uint16_t port;
-};
-
 struct listen_stats {
 	long active;
 	long queued;
 };
 
 #define OPLEN (sizeof(struct inet_diag_bc_op) + \
-               sizeof(struct inet_diag_hostcond) + \
-               sizeof(in_addr_t))
+	       sizeof(struct inet_diag_hostcond) + \
+	       sizeof(struct sockaddr_storage))
 
 struct nogvl_args {
 	struct iovec iov[3]; /* last iov holds inet_diag bytecode */
-	struct my_addr query_addr;
+	struct sockaddr_storage query_addr;
 	struct listen_stats stats;
 };
 
@@ -100,21 +96,6 @@ static VALUE rb_listen_stats(struct listen_stats *stats)
 	rb_funcall(rv, rb_intern("queued="), 1, queued);
 #endif /* ! Rubinius */
 	return rv;
-}
-
-/*
- * converts a base 10 string representing a port number into
- * an unsigned 16 bit integer.  Raises ArgumentError on failure
- */
-static uint16_t my_inet_port(const char *port)
-{
-	char *err;
-	unsigned long tmp = strtoul(port, &err, 10);
-
-	if (*err != 0 || tmp > 0xffff)
-		rb_raise(rb_eArgError, "port not parsable: `%s'\n", port);
-
-	return (uint16_t)tmp;
 }
 
 /* inner loop of inet_diag, called for every socket returned by netlink */
@@ -170,7 +151,7 @@ static VALUE diag(void *ptr)
 	req.nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
 	req.nlh.nlmsg_pid = getpid();
 	req.nlh.nlmsg_seq = seq;
-	req.r.idiag_family = AF_INET;
+	req.r.idiag_family = AF_INET | AF_INET6;
 	req.r.idiag_states = (1<<TCP_ESTABLISHED) | (1<<TCP_LISTEN);
 	rta.rta_type = INET_DIAG_REQ_BYTECODE;
 	rta.rta_len = RTA_LENGTH(args->iov[2].iov_len);
@@ -236,27 +217,61 @@ out:
 	return (VALUE)err;
 }
 
-/* populates inet my_addr struct by parsing +addr+ */
-static void parse_addr(struct my_addr *inet, VALUE addr)
+/* populates sockaddr_storage struct by parsing +addr+ */
+static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 {
-	char *host_port, *colon;
+	char *host_ptr;
+	char *colon = NULL;
+	char *rbracket = NULL;
+	long host_len;
+	struct addrinfo hints;
+	struct addrinfo *res;
+	int rc;
 
 	if (TYPE(addr) != T_STRING)
 		rb_raise(rb_eArgError, "addrs must be an Array of Strings");
 
-	host_port = RSTRING_PTR(addr);
-	colon = memchr(host_port, ':', RSTRING_LEN(addr));
+	host_ptr = StringValueCStr(addr);
+	host_len = RSTRING_LEN(addr);
+	if (*host_ptr == '[') { /* ipv6 address format (rfc2732) */
+		rbracket = memchr(host_ptr + 1, ']', host_len - 1);
+
+		if (rbracket) {
+			if (rbracket[1] == ':') {
+				colon = rbracket + 1;
+				host_ptr++;
+				*rbracket = 0;
+			} else {
+				rbracket = NULL;
+			}
+		}
+	} else { /* ipv4 */
+		colon = memchr(host_ptr, ':', host_len);
+	}
+
 	if (!colon)
-		rb_raise(rb_eArgError, "port not found in: `%s'", host_port);
+		rb_raise(rb_eArgError, "port not found in: `%s'", host_ptr);
+
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
 
 	*colon = 0;
-	inet->addr = inet_addr(host_port);
+	if (rbracket) *rbracket = 0;
+	rc = getaddrinfo(host_ptr, colon + 1, &hints, &res);
 	*colon = ':';
-	inet->port = htons(my_inet_port(colon + 1));
+	if (rbracket) *rbracket = ']';
+	if (rc != 0)
+		rb_raise(rb_eArgError, "getaddrinfo(%s): %s",
+			 host_ptr, gai_strerror(rc));
+
+	memcpy(inet, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
 }
 
 /* generates inet_diag bytecode to match a single addr */
-static void gen_bytecode(struct iovec *iov, struct my_addr *inet)
+static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
 {
 	struct inet_diag_bc_op *op;
 	struct inet_diag_hostcond *cond;
@@ -269,10 +284,30 @@ static void gen_bytecode(struct iovec *iov, struct my_addr *inet)
 	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
 
 	cond = (struct inet_diag_hostcond *)(op + 1);
-	cond->family = AF_INET;
-	cond->port = ntohs(inet->port);
-	cond->prefix_len = inet->addr == 0 ? 0 : sizeof(in_addr_t) * CHAR_BIT;
-	*cond->addr = inet->addr;
+	cond->family = inet->ss_family;
+	switch (inet->ss_family) {
+	case AF_INET: {
+		struct sockaddr_in *in = (struct sockaddr_in *)inet;
+
+		cond->port = ntohs(in->sin_port);
+		cond->prefix_len = in->sin_addr.s_addr == 0 ? 0 :
+				   sizeof(in->sin_addr.s_addr) * CHAR_BIT;
+		*cond->addr = in->sin_addr.s_addr;
+		}
+		break;
+	case AF_INET6: {
+		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)inet;
+
+		cond->port = ntohs(in6->sin6_port);
+		cond->prefix_len = memcmp(&in6addr_any, &in6->sin6_addr,
+				          sizeof(struct in6_addr)) == 0 ?
+				  0 : sizeof(in6->sin6_addr) * CHAR_BIT;
+		memcpy(&cond->addr, &in6->sin6_addr, sizeof(struct in6_addr));
+		}
+		break;
+	default:
+		assert("unsupported address family, could that be IPv7?!");
+	}
 }
 
 static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
