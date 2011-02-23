@@ -172,6 +172,7 @@ static VALUE aref(VALUE self, VALUE index)
 
 #ifdef __linux__
 void Init_raindrops_linux_inet_diag(void);
+void Init_raindrops_linux_tcp_info(void);
 #endif
 
 #ifndef _SC_NPROCESSORS_ONLN
@@ -215,5 +216,6 @@ void Init_raindrops_ext(void)
 
 #ifdef __linux__
 	Init_raindrops_linux_inet_diag();
+	Init_raindrops_linux_tcp_info();
 #endif
 }
