@@ -27,9 +27,8 @@ class Raindrops
     end
   end
 
-  # TODO: pure Ruby version for single processes
-  require 'raindrops_ext'
-
+  autoload :Linux, 'raindrops/linux'
   autoload :Struct, 'raindrops/struct'
   autoload :Middleware, 'raindrops/middleware'
 end
+require 'raindrops_ext'

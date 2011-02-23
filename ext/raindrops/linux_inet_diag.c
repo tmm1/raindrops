@@ -378,8 +378,6 @@ void Init_raindrops_linux_inet_diag(void)
 #ifndef HAVE_RB_STRUCT_ALLOC_NOINIT
 	id_new = rb_intern("new");
 #endif
-	rb_require("raindrops/linux");
-
 	page_size = getpagesize();
 
 	assert(OPLEN <= page_size && "bytecode OPLEN is not <= PAGE_SIZE");
