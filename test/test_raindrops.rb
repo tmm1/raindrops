@@ -4,6 +4,12 @@ require 'raindrops'
 
 class TestRaindrops < Test::Unit::TestCase
 
+  def test_raindrop_counter_max
+    assert_kind_of Integer, Raindrops::MAX
+    assert Raindrops::MAX > 0
+    printf "Raindrops::MAX = 0x%x\n", Raindrops::MAX
+  end
+
   def test_raindrop_size
     assert_kind_of Integer, Raindrops::SIZE
     assert Raindrops::SIZE > 0

@@ -203,6 +203,9 @@ void Init_raindrops_ext(void)
 #endif
 	rb_define_const(cRaindrops, "SIZE", SIZET2NUM(raindrop_size));
 
+	/* the maximum value a raindrop counter can hold */
+	rb_define_const(cRaindrops, "MAX", ULONG2NUM((unsigned long)-1));
+
 	rb_define_alloc_func(cRaindrops, alloc);
 
 	rb_define_method(cRaindrops, "initialize", init, 1);
