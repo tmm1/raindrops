@@ -8,22 +8,8 @@
 #ifndef RSTRING_LEN
 #  define RSTRING_LEN(s) (RSTRING(s)->len)
 #endif
-#ifdef RSTRUCT
-#  ifndef RSTRUCT_PTR
-#    define RSTRUCT_PTR(s) (RSTRUCT(s)->ptr)
-#   endif
-#  ifndef RSTRUCT_LEN
-#    define RSTRUCT_LEN(s) (RSTRUCT(s)->len)
-#  endif
-#endif
 
-#ifndef HAVE_RB_STRUCT_ALLOC_NOINIT
-static ID id_new;
-static VALUE rb_struct_alloc_noinit(VALUE class)
-{
-	return rb_funcall(class, id_new, 0, 0);
-}
-#endif /* !defined(HAVE_RB_STRUCT_ALLOC_NOINIT) */
+#include "rstruct_19.h"
 
 /* partial emulation of the 1.9 rb_thread_blocking_region under 1.8 */
 #ifndef HAVE_RB_THREAD_BLOCKING_REGION
