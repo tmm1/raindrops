@@ -32,17 +32,18 @@ class Raindrops::Middleware
   # standard Rack endpoint
   def call(env)
     env[PATH_INFO] == @path and return stats_response
+    begin
+      @stats.incr_calling
 
-    @stats.incr_calling
+      status, headers, body = @app.call(env)
+      rv = [ status, headers, Proxy.new(body, @stats) ]
 
-    status, headers, body = @app.call(env)
-    rv = [ status, headers, Proxy.new(body, @stats) ]
-
-    # the Rack server will start writing headers soon after this method
-    @stats.incr_writing
-    rv
+      # the Rack server will start writing headers soon after this method
+      @stats.incr_writing
+      rv
     ensure
       @stats.decr_calling
+    end
   end
 
   class Proxy
