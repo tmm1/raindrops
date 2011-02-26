@@ -14,7 +14,7 @@ class TestMiddleware < Test::Unit::TestCase
     app = Raindrops::Middleware.new(@app)
     response = app.call({})
     assert_equal @response[0,2], response[0,2]
-    assert response.last.kind_of?(Raindrops::Middleware)
+    assert response.last.kind_of?(Raindrops::Middleware::Proxy)
     assert response.last.object_id != app.object_id
     tmp = []
     response.last.each { |y| tmp << y }
@@ -35,7 +35,7 @@ class TestMiddleware < Test::Unit::TestCase
     assert_equal 0, stats.calling
     assert_equal 1, stats.writing
     assert_equal 200, response[0]
-    assert response.last.kind_of?(Raindrops::Middleware)
+    assert response.last.kind_of?(Raindrops::Middleware::Proxy)
     tmp = []
     response.last.each do |y|
       assert_equal 1, stats.writing
@@ -108,4 +108,17 @@ class TestMiddleware < Test::Unit::TestCase
     assert_equal expect, response
   end
 
+  def test_middleware_proxy_to_path_missing
+    app = Raindrops::Middleware.new(@app)
+    response = app.call({})
+    body = response[2]
+    assert_kind_of Raindrops::Middleware::Proxy, body
+    assert ! body.respond_to?(:to_path)
+    assert body.respond_to?(:close)
+    orig_body = @response[2]
+
+    def orig_body.to_path; "/dev/null"; end
+    assert body.respond_to?(:to_path)
+    assert_equal "/dev/null", body.to_path
+  end
 end

@@ -31,29 +31,44 @@ class Raindrops::Middleware
 
   # standard Rack endpoint
   def call(env)
-    env[PATH_INFO] == @path ? stats_response : dup._call(env)
-  end
+    env[PATH_INFO] == @path and return stats_response
 
-  def _call(env)
     @stats.incr_calling
-    status, headers, @app = @app.call(env)
+
+    status, headers, body = @app.call(env)
+    rv = [ status, headers, Proxy.new(body, @stats) ]
 
     # the Rack server will start writing headers soon after this method
     @stats.incr_writing
-    [ status, headers, self ]
+    rv
     ensure
       @stats.decr_calling
   end
 
-  # yield to the Rack server here for writing
-  def each
-    @app.each { |x| yield x }
-  end
+  class Proxy
+    def initialize(body, stats)
+      @body, @stats = body, stats
+    end
 
-  # the Rack server should call this after #each (usually ensure-d)
-  def close
-    @stats.decr_writing
-    @app.close if @app.respond_to?(:close)
+    # yield to the Rack server here for writing
+    def each
+      @body.each { |x| yield x }
+    end
+
+    # the Rack server should call this after #each (usually ensure-d)
+    def close
+      @stats.decr_writing
+      @body.close if @body.respond_to?(:close)
+    end
+
+    def to_path
+      @body.to_path
+    end
+
+    def respond_to?(m)
+      m = m.to_sym
+      :close == m || @body.respond_to?(m)
+    end
   end
 
   def stats_response
