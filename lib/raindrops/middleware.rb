@@ -9,6 +9,7 @@ class Raindrops::Middleware
   # :stopdoc:
   Stats = Raindrops::Struct.new(:calling, :writing)
   PATH_INFO = "PATH_INFO"
+  require "raindrops/middleware/proxy"
   # :startdoc:
 
   def initialize(app, opts = {})
@@ -43,32 +44,6 @@ class Raindrops::Middleware
       rv
     ensure
       @stats.decr_calling
-    end
-  end
-
-  class Proxy
-    def initialize(body, stats)
-      @body, @stats = body, stats
-    end
-
-    # yield to the Rack server here for writing
-    def each
-      @body.each { |x| yield x }
-    end
-
-    # the Rack server should call this after #each (usually ensure-d)
-    def close
-      @stats.decr_writing
-      @body.close if @body.respond_to?(:close)
-    end
-
-    def to_path
-      @body.to_path
-    end
-
-    def respond_to?(m)
-      m = m.to_sym
-      :close == m || @body.respond_to?(m)
     end
   end
 
