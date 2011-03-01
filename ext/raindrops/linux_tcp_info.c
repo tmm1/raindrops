@@ -1,7 +1,7 @@
 #include <ruby.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
+#include <linux/tcp.h>
 #ifdef TCP_INFO
 #include "my_fileno.h"
 
