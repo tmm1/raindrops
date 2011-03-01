@@ -37,8 +37,15 @@ end
 
 fmt = "% 19s % 10u % 10u\n"
 printf fmt.tr('u','s'), *%w(address active queued)
+tcp, unix = [], []
+ARGV.each { |addr| (addr =~ %r{\A/} ? unix : tcp) << addr }
+stats = {}
+tcp = nil if tcp.empty?
+unix = nil if unix.empty?
 
 begin
-  stats = Raindrops::Linux.tcp_listener_stats(ARGV)
+  stats.clear
+  tcp and stats.merge! Raindrops::Linux.tcp_listener_stats(tcp)
+  unix and stats.merge! Raindrops::Linux.unix_listener_stats(unix)
   stats.each { |addr,stats| printf fmt, addr, stats.active, stats.queued }
 end while delay && sleep(delay)
