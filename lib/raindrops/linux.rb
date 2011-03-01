@@ -1,4 +1,8 @@
 # -*- encoding: binary -*-
+
+# For reporting TCP ListenStats, users of older Linux kernels need to ensure
+# that the the "inet_diag" and "tcp_diag" kernel modules are loaded as they do
+# not autoload correctly
 module Raindrops::Linux
 
   # The standard proc path for active UNIX domain sockets, feel free to call

@@ -32,6 +32,9 @@ processes under SMP.
   instead of parsing /proc/net/tcp to minimize overhead.
   This was fun to discover and write.
 
+Users of older Linux kernels need to ensure that the the "inet_diag"
+and "tcp_diag" kernel modules are loaded as they do not autoload correctly
+
 == Install
 
 We recommend GCC 4+ (or compatible) to support the
