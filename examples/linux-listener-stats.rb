@@ -6,9 +6,11 @@ $stdout.sync = $stderr.sync = true
 require 'raindrops'
 require 'optparse'
 require 'ipaddr'
-usage = "Usage: #$0 [-d delay] ADDR..."
+require 'time'
+usage = "Usage: #$0 [-d DELAY] [-t QUEUED_THRESHOLD] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
+queued_thresh = -1
 
 # "normal" exits when driven on the command-line
 trap(:INT) { exit 130 }
@@ -16,7 +18,8 @@ trap(:PIPE) { exit 0 }
 
 opts = OptionParser.new('', 24, '  ') do |opts|
   opts.banner = usage
-  opts.on('-d', '--delay=delay') { |nr| delay = nr.to_f }
+  opts.on('-d', '--delay=DELAY', Float) { |n| delay = n }
+  opts.on('-t', '--queued-threshold=INT', Integer) { |n| queued_thresh = n }
   opts.parse! ARGV
 end
 
@@ -35,17 +38,24 @@ ARGV.each do |addr|
   end
 end
 
-fmt = "% 19s % 10u % 10u\n"
-printf fmt.tr('u','s'), *%w(address active queued)
+now = nil
+fmt = "%20s % 35s % 10u % 10u\n"
+$stderr.printf fmt.tr('u','s'), *%w(timestamp address active queued)
 tcp, unix = [], []
 ARGV.each { |addr| (addr =~ %r{\A/} ? unix : tcp) << addr }
-stats = {}
+combined = {}
 tcp = nil if tcp.empty?
 unix = nil if unix.empty?
 
 begin
-  stats.clear
-  tcp and stats.merge! Raindrops::Linux.tcp_listener_stats(tcp)
-  unix and stats.merge! Raindrops::Linux.unix_listener_stats(unix)
-  stats.each { |addr,stats| printf fmt, addr, stats.active, stats.queued }
+  if now
+    combined.clear
+    now = nil
+  end
+  tcp and combined.merge! Raindrops::Linux.tcp_listener_stats(tcp)
+  unix and combined.merge! Raindrops::Linux.unix_listener_stats(unix)
+  combined.each do |addr,stats|
+    next if stats.queued < queued_thresh
+    printf fmt, now ||= Time.now.utc.iso8601, addr, stats.active, stats.queued
+  end
 end while delay && sleep(delay)
