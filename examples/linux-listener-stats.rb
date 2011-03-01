@@ -16,7 +16,7 @@ trap(:PIPE) { exit 0 }
 
 opts = OptionParser.new('', 24, '  ') do |opts|
   opts.banner = usage
-  opts.on('-d', '--delay=delay') { |nr| delay = nr.to_i }
+  opts.on('-d', '--delay=delay') { |nr| delay = nr.to_f }
   opts.parse! ARGV
 end
 
