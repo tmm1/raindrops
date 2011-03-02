@@ -1,14 +1,5 @@
 # -*- encoding: binary -*-
-require "test/unit"
-require "raindrops"
-require "rack"
-require "rack/lobster"
-require "open-uri"
-begin
-  require "unicorn"
-rescue => e
-  warn "W: #{e} skipping test since Unicorn was not found"
-end
+require "./test/rack_unicorn"
 $stderr.sync = $stdout.sync = true
 
 class TestMiddlewareUnicorn < Test::Unit::TestCase

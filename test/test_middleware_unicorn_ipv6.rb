@@ -1,23 +1,6 @@
 # -*- encoding: binary -*-
-require "test/unit"
-require "raindrops"
-require "rack"
-require "rack/lobster"
-require "open-uri"
-begin
-  require "unicorn"
-rescue => e
-  warn "W: #{e} skipping test since Unicorn was not found"
-end
-
-begin
-  tmp = TCPServer.new(ENV["TEST_HOST6"] || '::1', 0)
-  ipv6_enabled = true
-rescue => e
-  warn "skipping IPv6 tests, host does not seem to be IPv6 enabled:"
-  warn "  #{e.class}: #{e}"
-  ipv6_enabled = false
-end
+require "./test/rack_unicorn"
+require "./test/ipv6_enabled"
 $stderr.sync = $stdout.sync = true
 
 class TestMiddlewareUnicornIPv6 < Test::Unit::TestCase
@@ -51,5 +34,4 @@ class TestMiddlewareUnicornIPv6 < Test::Unit::TestCase
     _, status = Process.waitpid2 @srv
     assert status.success?
   end
-end if defined?(Unicorn) && RUBY_PLATFORM =~ /linux/ && ipv6_enabled
-
+end if defined?(Unicorn) && RUBY_PLATFORM =~ /linux/ && ipv6_enabled?

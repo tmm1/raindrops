@@ -4,16 +4,8 @@ require 'tempfile'
 require 'raindrops'
 require 'socket'
 require 'pp'
+require "./test/ipv6_enabled"
 $stderr.sync = $stdout.sync = true
-
-begin
-  tmp = TCPServer.new(ENV["TEST_HOST6"] || '::1', 0)
-  ipv6_enabled = true
-rescue => e
-  warn "skipping IPv6 tests, host does not seem to be IPv6 enabled:"
-  warn "  #{e.class}: #{e}"
-  ipv6_enabled = false
-end
 
 class TestLinuxIPv6 < Test::Unit::TestCase
   include Raindrops::Linux
@@ -158,4 +150,4 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     statuses = Process.waitall
     statuses.each { |(pid,status)| assert status.success?, status.inspect }
   end if ENV["STRESS"].to_i != 0
-end if RUBY_PLATFORM =~ /linux/ && ipv6_enabled
+end if RUBY_PLATFORM =~ /linux/ && ipv6_enabled?
