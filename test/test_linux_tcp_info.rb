@@ -42,4 +42,20 @@ class TestLinuxTCP_Info < Test::Unit::TestCase
     ensure
       s.close
   end
+
+  def test_tcp_server_delayed
+    delay = 0.010
+    delay_ms = (delay * 1000).to_i
+    s = TCPServer.new(TEST_ADDR, 0)
+    c = TCPSocket.new TEST_ADDR, s.addr[1]
+    c.syswrite "."
+    sleep delay
+    a = s.accept
+    i = Raindrops::TCP_Info.new(a)
+    assert i.last_data_recv >= delay_ms, "#{i.last_data_recv} < #{delay_ms}"
+    ensure
+      c.close if c
+      a.close if a
+      s.close
+  end
 end
