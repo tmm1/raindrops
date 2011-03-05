@@ -30,5 +30,6 @@ class Raindrops
   autoload :Linux, 'raindrops/linux'
   autoload :Struct, 'raindrops/struct'
   autoload :Middleware, 'raindrops/middleware'
+  autoload :Aggregate, 'raindrops/aggregate'
 end
 require 'raindrops_ext'
