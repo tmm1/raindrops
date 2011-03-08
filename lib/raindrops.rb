@@ -31,5 +31,6 @@ class Raindrops
   autoload :Struct, 'raindrops/struct'
   autoload :Middleware, 'raindrops/middleware'
   autoload :Aggregate, 'raindrops/aggregate'
+  autoload :LastDataRecv, 'raindrops/last_data_recv'
 end
 require 'raindrops_ext'

@@ -10,6 +10,7 @@ class Raindrops::Middleware
   Stats = Raindrops::Struct.new(:calling, :writing)
   PATH_INFO = "PATH_INFO"
   require "raindrops/middleware/proxy"
+  autoload :TCP, "raindrops/middleware/tcp"
   # :startdoc:
 
   def initialize(app, opts = {})
