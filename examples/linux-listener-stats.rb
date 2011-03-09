@@ -8,14 +8,43 @@ require 'raindrops'
 require 'optparse'
 require 'ipaddr'
 require 'time'
+begin
+  require 'aggregate'
+rescue LoadError
+  $stderr.puts "Aggregate missing, USR1 and USR2 handlers unavailable"
+end
+
 usage = "Usage: #$0 [-d DELAY] [-t QUEUED_THRESHOLD] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
 queued_thresh = -1
-
 # "normal" exits when driven on the command-line
 trap(:INT) { exit 130 }
 trap(:PIPE) { exit 0 }
+
+agg_active = agg_queued = nil
+if defined?(Aggregate)
+  agg_active = Aggregate.new
+  agg_queued = Aggregate.new
+
+  def dump_aggregate(label, agg)
+    $stderr.write "--- #{label} ---\n"
+    %w(count min max outliers_low outliers_high mean std_dev).each do |f|
+      $stderr.write "#{f}=#{agg.__send__ f}\n"
+    end
+    $stderr.write "#{agg}\n\n"
+  end
+
+  trap(:USR1) do
+    dump_aggregate "active", agg_active
+    dump_aggregate "queued", agg_queued
+  end
+  trap(:USR2) do
+    agg_active = Aggregate.new
+    agg_queued = Aggregate.new
+  end
+  $stderr.puts "USR1(dump_aggregate) and USR2(reset) handlers ready for PID=#$$"
+end
 
 opts = OptionParser.new('', 24, '  ') do |opts|
   opts.banner = usage
@@ -63,7 +92,12 @@ begin
   tcp and combined.merge! Raindrops::Linux.tcp_listener_stats(tcp)
   unix and combined.merge! Raindrops::Linux.unix_listener_stats(unix)
   combined.each do |addr,stats|
-    next if stats.queued < queued_thresh
-    printf fmt, now ||= Time.now.utc.iso8601, addr, stats.active, stats.queued
+    active, queued = stats.active, stats.queued
+    if agg_active
+      agg_active << active
+      agg_queued << queued
+    end
+    next if queued < queued_thresh
+    printf fmt, now ||= Time.now.utc.iso8601, addr, active, queued
   end
 end while delay && sleep(delay)
