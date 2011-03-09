@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# -*- encoding: binary -*-
 $stdout.sync = $stderr.sync = true
 # this is used to show or watch the number of active and queued
 # connections on any listener socket from the command line
@@ -38,14 +39,21 @@ ARGV.each do |addr|
   end
 end
 
+len = "address".size
 now = nil
-fmt = "%20s % 35s % 10u % 10u\n"
-$stderr.printf fmt.tr('u','s'), *%w(timestamp address active queued)
 tcp, unix = [], []
-ARGV.each { |addr| (addr =~ %r{\A/} ? unix : tcp) << addr }
+ARGV.each do |addr|
+  bs = addr.respond_to?(:bytesize) ? addr.bytesize : addr.size
+  len = bs if bs > len
+  (addr =~ %r{\A/} ? unix : tcp) << addr
+end
 combined = {}
 tcp = nil if tcp.empty?
 unix = nil if unix.empty?
+
+len = 35 if len > 35
+fmt = "%20s % #{len}s % 10u % 10u\n"
+$stderr.printf fmt.tr('u','s'), *%w(timestamp address active queued)
 
 begin
   if now
