@@ -8,12 +8,6 @@ require 'raindrops'
 require 'optparse'
 require 'ipaddr'
 require 'time'
-begin
-  require 'aggregate'
-rescue LoadError
-  $stderr.puts "Aggregate missing, USR1 and USR2 handlers unavailable"
-end
-
 usage = "Usage: #$0 [-d DELAY] [-t QUEUED_THRESHOLD] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
@@ -22,8 +16,21 @@ queued_thresh = -1
 trap(:INT) { exit 130 }
 trap(:PIPE) { exit 0 }
 
+opts = OptionParser.new('', 24, '  ') do |opts|
+  opts.banner = usage
+  opts.on('-d', '--delay=DELAY', Float) { |n| delay = n }
+  opts.on('-t', '--queued-threshold=INT', Integer) { |n| queued_thresh = n }
+  opts.parse! ARGV
+end
+
+begin
+  require 'aggregate'
+rescue LoadError
+  $stderr.puts "Aggregate missing, USR1 and USR2 handlers unavailable"
+end if delay
+
 agg_active = agg_queued = nil
-if defined?(Aggregate)
+if delay && defined?(Aggregate)
   agg_active = Aggregate.new
   agg_queued = Aggregate.new
 
@@ -44,13 +51,6 @@ if defined?(Aggregate)
     agg_queued = Aggregate.new
   end
   $stderr.puts "USR1(dump_aggregate) and USR2(reset) handlers ready for PID=#$$"
-end
-
-opts = OptionParser.new('', 24, '  ') do |opts|
-  opts.banner = usage
-  opts.on('-d', '--delay=DELAY', Float) { |n| delay = n }
-  opts.on('-t', '--queued-threshold=INT', Integer) { |n| queued_thresh = n }
-  opts.parse! ARGV
 end
 
 ARGV.each do |addr|
