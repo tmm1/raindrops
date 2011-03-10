@@ -1,8 +1,15 @@
 # -*- encoding: binary -*-
+#
+# Each Raindrops object is a container that holds several counters.
+# It is internally a page-aligned, shared memory area that allows
+# atomic increments, decrements, assignments and reads without any
+# locking.
+#
+#   rd = Raindrops.new 4
+#   rd.incr(0, 1)   -> 1
+#   rd.to_ary       -> [ 1, 0, 0, 0 ]
+#
 class Raindrops
-
-  # Raindrops is currently at version 0.4.1
-  VERSION = '0.4.1'
 
   # Used to represent the number of +active+ and +queued+ sockets for
   # a single listen socket across all threads and processes on a
@@ -18,7 +25,7 @@ class Raindrops
   # +queued+ connections is the number of un-accept()-ed sockets in the
   # queue of a given listen socket.
   #
-  # These stats are currently only available under Linux
+  # These stats are currently only available under \Linux
   class ListenStats < Struct.new(:active, :queued)
 
     # the sum of +active+ and +queued+ sockets

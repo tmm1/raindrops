@@ -1,4 +1,7 @@
 # -*- encoding: binary -*-
+# :stopdoc:
+# This class is by Raindrops::Middleware to proxy application response
+# bodies.  There should be no need to use it directly.
 class Raindrops::Middleware::Proxy
   def initialize(body, stats)
     @body, @stats = body, stats
@@ -15,10 +18,15 @@ class Raindrops::Middleware::Proxy
     @body.close if @body.respond_to?(:close)
   end
 
+  # Some Rack servers can optimize response processing if it responds
+  # to +to_path+ via the sendfile(2) system call, we proxy +to_path+
+  # to the underlying body if possible.
   def to_path
     @body.to_path
   end
 
+  # Rack servers use +respond_to?+ to check for the presence of +close+
+  # and +to_path+ methods.
   def respond_to?(m)
     m = m.to_sym
     :close == m || @body.respond_to?(m)

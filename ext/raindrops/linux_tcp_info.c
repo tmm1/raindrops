@@ -53,6 +53,14 @@ static VALUE alloc(VALUE klass)
 	return Data_Wrap_Struct(klass, NULL, -1, info);
 }
 
+/*
+ * call-seq:
+ *
+ *	Raindrops::TCP_Info.new(tcp_socket)	-> TCP_Info object
+ *
+ * Reads a TCP_Info object from any given +tcp_socket+.  See the tcp(7)
+ * manpage and /usr/include/linux/tcp.h for more details.
+ */
 static VALUE init(VALUE self, VALUE io)
 {
 	int fd = my_fileno(io);
@@ -71,6 +79,49 @@ void Init_raindrops_linux_tcp_info(void)
 	VALUE cRaindrops = rb_const_get(rb_cObject, rb_intern("Raindrops"));
 	VALUE cTCP_Info;
 
+	/*
+	 * Document-class: Raindrops::TCP_Info
+	 *
+	 * This is used to wrap "struct tcp_info" as described in tcp(7)
+	 * and /usr/include/linux/tcp.h.  The following readers methods
+	 * are defined corresponding to the "tcpi_" fields in the
+	 * tcp_info struct.
+	 *
+	 * - state
+	 * - ca_state
+	 * - retransmits
+	 * - probes
+	 * - backoff
+	 * - options
+	 * - snd_wscale
+	 * - rcv_wscale
+	 * - rto
+	 * - ato
+	 * - snd_mss
+	 * - rcv_mss
+	 * - unacked
+	 * - sacked
+	 * - lost
+	 * - retrans
+	 * - fackets
+	 * - last_data_sent
+	 * - last_ack_sent
+	 * - last_data_recv
+	 * - last_ack_recv
+	 * - pmtu
+	 * - rcv_ssthresh
+	 * - rtt
+	 * - rttvar
+	 * - snd_ssthresh
+	 * - snd_cwnd
+	 * - advmss
+	 * - reordering
+	 * - rcv_rtt
+	 * - rcv_space
+	 * - total_retrans
+	 *
+	 * http://kernel.org/doc/man-pages/online/pages/man7/tcp.7.html
+	 */
 	cTCP_Info = rb_define_class_under(cRaindrops, "TCP_Info", rb_cObject);
 	rb_define_alloc_func(cTCP_Info, alloc);
 	rb_define_private_method(cTCP_Info, "initialize", init, 1);

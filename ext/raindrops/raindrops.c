@@ -22,7 +22,7 @@ struct raindrop {
 	unsigned long counter;
 } __attribute__((packed));
 
-/* allow mmap-ed regions can store more than one raindrop */
+/* allow mmap-ed regions to store more than one raindrop */
 struct raindrops {
 	long size;
 	struct raindrop *drops;
@@ -59,7 +59,16 @@ static struct raindrops *get(VALUE self)
 	return r;
 }
 
-/* initializes a Raindrops object to hold +size+ elements */
+/*
+ * call-seq:
+ *	Raindrops.new(size)	-> raindrops object
+ *
+ * Initializes a Raindrops object to hold +size+ counters.  +size+ is
+ * only a hint and the actual number of counters the object has is
+ * dependent on the CPU model, number of cores, and page size of
+ * the machine.  The actual size of the object will always be equal
+ * or greater than the specified +size+.
+ */
 static VALUE init(VALUE self, VALUE size)
 {
 	struct raindrops *r = get(self);
@@ -87,7 +96,12 @@ retry:
 	return self;
 }
 
-/* :nodoc */
+/*
+ * call-seq:
+ *	rd.dup		-> rd_copy
+ *
+ * Duplicates and snapshots the current state of a Raindrops object.
+ */
 static VALUE init_copy(VALUE dest, VALUE source)
 {
 	struct raindrops *dst = get(dest);
@@ -119,7 +133,13 @@ static unsigned long incr_decr_arg(int argc, const VALUE *argv)
 	return argc == 2 ? NUM2ULONG(argv[1]) : 1;
 }
 
-/* increments the value referred to by the +index+ constant by 1 */
+/*
+ * call-seq:
+ *	rd.incr(index[, number])	-> result
+ *
+ * Increments the value referred to by the +index+ by +number+.
+ * +number+ defaults to +1+ if unspecified.
+ */
 static VALUE incr(int argc, VALUE *argv, VALUE self)
 {
 	unsigned long nr = incr_decr_arg(argc, argv);
@@ -127,7 +147,13 @@ static VALUE incr(int argc, VALUE *argv, VALUE self)
 	return ULONG2NUM(__sync_add_and_fetch(addr_of(self, argv[0]), nr));
 }
 
-/* decrements the value referred to by the +index+ constant by 1 */
+/*
+ * call-seq:
+ *	rd.decr(index[, number])	-> result
+ *
+ * Decrements the value referred to by the +index+ by +number+.
+ * +number+ defaults to +1+ if unspecified.
+ */
 static VALUE decr(int argc, VALUE *argv, VALUE self)
 {
 	unsigned long nr = incr_decr_arg(argc, argv);
@@ -135,7 +161,12 @@ static VALUE decr(int argc, VALUE *argv, VALUE self)
 	return ULONG2NUM(__sync_sub_and_fetch(addr_of(self, argv[0]), nr));
 }
 
-/* converts the raindrops structure to an Array */
+/*
+ * call-seq:
+ *	rd.to_ary	-> Array
+ *
+ * converts the Raindrops structure to an Array
+ */
 static VALUE to_ary(VALUE self)
 {
 	struct raindrops *r = get(self);
@@ -151,11 +182,25 @@ static VALUE to_ary(VALUE self)
 	return rv;
 }
 
+/*
+ * call-seq:
+ *	rd.size		-> Integer
+ *
+ * Returns the number of counters a Raindrops object can hold.  Due to
+ * page alignment, this is always equal or greater than the number of
+ * requested slots passed to Raindrops.new
+ */
 static VALUE size(VALUE self)
 {
 	return LONG2NUM(get(self)->size);
 }
 
+/*
+ * call-seq:
+ *	rd[index] = value
+ *
+ * Assigns +value+ to the slot designated by +index+
+ */
 static VALUE aset(VALUE self, VALUE index, VALUE value)
 {
 	unsigned long *addr = addr_of(self, index);
@@ -165,6 +210,12 @@ static VALUE aset(VALUE self, VALUE index, VALUE value)
 	return value;
 }
 
+/*
+ * call-seq:
+ *	rd[index]	-> value
+ *
+ * Returns the value of the slot designated by +index+
+ */
 static VALUE aref(VALUE self, VALUE index)
 {
 	return  ULONG2NUM(*addr_of(self, index));
@@ -201,9 +252,19 @@ void Init_raindrops_ext(void)
 			raindrop_size = (size_t)tmp;
 	}
 #endif
+
+	/*
+	 * The size (in bytes) of a slot in a Raindrops object.
+	 * This is the size of a word on single CPU systems and
+	 * the size of the L1 cache line size if detectable.
+	 *
+	 * Defaults to 128 bytes if undetectable.
+	 */
 	rb_define_const(cRaindrops, "SIZE", SIZET2NUM(raindrop_size));
 
-	/* the maximum value a raindrop counter can hold */
+	/*
+	 * The maximum value a raindrop counter can hold
+	 */
 	rb_define_const(cRaindrops, "MAX", ULONG2NUM((unsigned long)-1));
 
 	rb_define_alloc_func(cRaindrops, alloc);

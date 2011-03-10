@@ -1,13 +1,11 @@
 = raindrops - real-time stats for preforking Rack servers
 
-Raindrops is a real time stats package to show statistics for Rack HTTP
+Raindrops is a real-time stats toolkit to show statistics for Rack HTTP
 servers.  It is designed for preforking servers such as Rainbows! and
 Unicorn, but should support any Rack HTTP server under Ruby 1.9, 1.8 and
-Rubinius on platforms supporting POSIX shared memory.
-
-Raindrops includes a Struct-like Raindrops::Struct class that may be used
-standalone to create atomic counters shared across any number of forked
-processes under SMP.
+Rubinius on platforms supporting POSIX shared memory.  It may also be
+used as a generic scoreboard for sharing atomic counters across multiple
+processes.
 
 == Features
 
@@ -57,46 +55,12 @@ http://raindrops.bogomips.org/files/
 
 Unpack it, and run "ruby setup.rb"
 
-== Usage (Rainbows!/Unicorn preload_app=false)
+== Usage
 
-If you're using preload_app=false (the default) in your Rainbows!/Unicorn
-config file, you'll need to create the global Stats object before
-forking.
-
-        require 'raindrops'
-        $stats ||= Raindrops::Middleware::Stats.new
-
-In your Rack config.ru:
-
-        use Raindrops::Middleware, :stats => $stats
-
-== Usage (Rainbows!/Unicorn preload_app=true)
-
-If you're using preload_app=true in your Rainbows!/Unicorn
-config file, just add the middleware to your stack:
-
-In your Rack config.ru:
-
-        use Raindrops::Middleware
-
-== Usage (Linux-extras)
-
-To get bound listener statistics under Linux, you need to specify the
-listener names for your server.  You can even include listen sockets for
-*other* servers on the same machine.  This can be handy for monitoring
-your nginx proxy as well.
-
-In your Rack config.ru, just pass the :listeners argument as an array of
-strings (along with any other arguments).  You can specify any
-combination of TCP or Unix domain socket names:
-
-        use Raindrops::Middleware, :listeners => %w(0.0.0.0:80 /tmp/.sock)
-
-See the tests/ and examples/ directory for more examples.
-
-If you're running Unicorn 0.98.0 or later, you don't have to pass in
-the :listeners array, Raindrops will automatically detect the listeners
-used by Unicorn master process.
+See Raindrops::Middleware and Raindrops::LastDataRecv documentation for
+use Rack servers.  The entire library is fully-documented and we are
+responsive on the mailing list (mailto:raindrops@librelist.com) if you
+have any questions or comments.
 
 == Development
 

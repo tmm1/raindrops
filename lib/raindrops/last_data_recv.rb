@@ -5,7 +5,7 @@ require "raindrops"
 #
 # A self-contained Rack application for aggregating in the
 # +tcpi_last_data_recv+ field in +struct tcp_info+ if
-# /usr/include/linux/tcp.h.  This is only useful for Linux 2.6 and later.
+# /usr/include/linux/tcp.h.  This is only useful for \Linux 2.6 and later.
 # This primarily supports Unicorn and derived servers, but may also be
 # used with any Ruby web server using the core TCPServer class in Ruby.
 #

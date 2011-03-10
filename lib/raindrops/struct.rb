@@ -1,7 +1,22 @@
 # -*- encoding: binary -*-
 
+# This is a wrapper around Raindrops objects much like the core Ruby
+# \Struct can be seen as a wrapper around the core \Array class.
+# It's usage is similar to the core \Struct class, except its fields
+# may only be used to house unsigned long integers.
+#
+#   class Foo < Raindrops::Struct.new(:readers, :writers)
+#   end
+#
+#   foo = Foo.new 0, 0
+#
+#   foo.incr_writers    -> 1
+#   foo.incr_readers    -> 1
+#
 class Raindrops::Struct
 
+  # returns a new class derived from Raindrops::Struct and supporting
+  # the given +members+ as fields, just like \Struct.new in core Ruby.
   def self.new(*members)
     members = members.map { |x| x.to_sym }.freeze
     str = <<EOS
