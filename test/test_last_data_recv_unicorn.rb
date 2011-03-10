@@ -10,6 +10,10 @@ rescue => LoadError
   warn "W: #{e} skipping test"
   false
 end
+if RUBY_VERSION.to_f < 1.9
+  pmq = false
+  warn "W: skipping test=#{__FILE__}, only Ruby 1.9 supported for now"
+end
 
 class TestLastDataRecvUnicorn < Test::Unit::TestCase
   def setup

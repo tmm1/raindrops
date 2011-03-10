@@ -6,6 +6,10 @@ rescue => LoadError
   warn "W: #{e} skipping test"
   false
 end
+if RUBY_VERSION.to_f < 1.9
+  pmq = false
+  warn "W: skipping #{__FILE__}, only Ruby 1.9 supported for now"
+end
 
 Thread.abort_on_exception = true
 
