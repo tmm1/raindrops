@@ -6,9 +6,9 @@ class TestMiddlewareUnicorn < Test::Unit::TestCase
 
   def setup
     @host = ENV["UNICORN_TEST_ADDR"] || "127.0.0.1"
-    sock = TCPServer.new @host, 0
-    @port = sock.addr[1]
-    ENV["UNICORN_FD"] = sock.fileno.to_s
+    @sock = TCPServer.new @host, 0
+    @port = @sock.addr[1]
+    ENV["UNICORN_FD"] = @sock.fileno.to_s
     @host_with_port = "#@host:#@port"
     @opts = { :listeners => [ @host_with_port ] }
     @addr_regexp = Regexp.escape @host_with_port
