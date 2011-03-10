@@ -4,9 +4,13 @@ require "aggregate"
 require "posix_mq"
 require "fcntl"
 require "io/extra"
+require "thread"
 
 # Aggregate + POSIX message queues support
 class Raindrops::Aggregate::PMQ
+
+  # These constants are for Linux.  Tthis is designed for aggregating
+  # TCP_INFO.
   RDLOCK = [ Fcntl::F_RDLCK ].pack("s @256")
   WRLOCK = [ Fcntl::F_WRLCK ].pack("s @256")
   UNLOCK = [ Fcntl::F_UNLCK ].pack("s @256")
@@ -27,6 +31,7 @@ class Raindrops::Aggregate::PMQ
     @worker_interval = opts[:worker_interval]
     @aggregate = opts[:aggregate]
     @worker_queue = @worker_interval ? [] : nil
+    @mutex = Mutex.new
 
     @mq_name = opts[:queue]
     mq = POSIX_MQ.new @mq_name, :w, opts[:mq_umask], opts[:mq_attr]
@@ -118,10 +123,14 @@ class Raindrops::Aggregate::PMQ
   end
 
   def synchronize io, type
-    lock! io, type
-    yield io
-    ensure
-      lock! io, UNLOCK
+    @mutex.synchronize do
+      begin
+        lock! io, type
+        yield io
+      ensure
+        lock! io, UNLOCK
+      end
+    end
   end
 
   def flush
