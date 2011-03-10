@@ -22,9 +22,7 @@ Gem::Specification.new do |s|
   s.rdoc_options = rdoc_options
   s.rubyforge_project = %q{rainbows}
   s.test_files = test_files
-  s.add_development_dependency('wrongdoc', '~> 1.5')
-  s.add_development_dependency('rack', '~> 1.2')
-  s.add_development_dependency('unicorn', '>= 0.98')
+  s.add_development_dependency('bundler', '~> 1.0.10')
 
   # s.licenses = %w(LGPLv3) # accessor not compatible with older RubyGems
 end
