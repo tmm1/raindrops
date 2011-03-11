@@ -9,6 +9,10 @@
 #   rd.incr(0, 1)   -> 1
 #   rd.to_ary       -> [ 1, 0, 0, 0 ]
 #
+# Unlike many classes in this package, the core Raindrops class is
+# intended to be portable to all reasonably modern *nix systems
+# supporting mmap().  Please let us know if you have portability
+# issues, patches or pull requests at mailto:raindrops@librelist.com
 class Raindrops
 
   # Used to represent the number of +active+ and +queued+ sockets for
