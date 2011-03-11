@@ -2,7 +2,12 @@
 
 # For reporting TCP ListenStats, users of older \Linux kernels need to ensure
 # that the the "inet_diag" and "tcp_diag" kernel modules are loaded as they do
-# not autoload correctly
+# not autoload correctly.  The inet_diag facilities of \Raindrops is useful
+# for periodic snapshot reporting of listen queue sizes.
+#
+# Instead of snapshotting, Raindrops::Aggregate::LastDataRecv may be used
+# to aggregate statistics from +all+ accepted sockets as they arrive
+# based on the +last_data_recv+ field in Raindrops::TCP_Info
 module Raindrops::Linux
 
   # The standard proc path for active UNIX domain sockets, feel free to call

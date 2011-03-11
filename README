@@ -30,6 +30,9 @@ processes.
   instead of parsing /proc/net/tcp to minimize overhead.
   This was fun to discover and write.
 
+* TCP_Info reporting may be used to check stat for every accepted client
+  on TCP servers
+
 Users of older Linux kernels need to ensure that the the "inet_diag"
 and "tcp_diag" kernel modules are loaded as they do not autoload correctly
 

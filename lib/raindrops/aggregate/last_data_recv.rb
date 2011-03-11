@@ -1,8 +1,11 @@
 # -*- encoding: binary -*-
 require "socket"
 #
+#
 # This module is used to extend TCPServer and Kgio::TCPServer objects
-# and aggregate +last_data_recv+ times for all accepted clients.
+# and aggregate +last_data_recv+ times for all accepted clients. It
+# is designed to be used with Raindrops::LastDataRecv Rack application
+# but can be easily changed to work with other stats collection devices.
 #
 # Methods wrapped include:
 # - TCPServer#accept
@@ -15,16 +18,19 @@ module Raindrops::Aggregate::LastDataRecv
   # :startdoc:
 
   # The integer value of +last_data_recv+ is sent to this object.
+  # This is usually a duck type compatible with the \Aggregate class,
+  # but can be *anything* that accepts the *<<* method.
   attr_accessor :raindrops_aggregate
 
   @@default_aggregate = nil
 
   # By default, this is a Raindrops::Aggregate::PMQ object
+  # It may be anything that responds to *<<*
   def self.default_aggregate
     @@default_aggregate ||= Raindrops::Aggregate::PMQ.new
   end
 
-  # assign any object that is duck-type compatible with \Aggregate here,
+  # Assign any object that responds to *<<*
   def self.default_aggregate=(agg)
     @@default_aggregate = agg
   end
