@@ -87,6 +87,11 @@ void Init_raindrops_linux_tcp_info(void)
 	 * are defined corresponding to the "tcpi_" fields in the
 	 * tcp_info struct.
 	 *
+	 * In particular, the +last_data_recv+ field is useful for measuring
+	 * the amount of time a client spent in the listen queue before
+	 * +accept()+, but only if +TCP_DEFER_ACCEPT+ is used with the
+	 * listen socket (it is on by default in Unicorn).
+	 *
 	 * - state
 	 * - ca_state
 	 * - retransmits
