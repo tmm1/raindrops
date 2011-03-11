@@ -34,4 +34,4 @@ class TestRaindropsGc < Test::Unit::TestCase
     assert status.success?
     assert_equal [ 0, 2 ], tmp.to_ary
   end
-end
+end if !defined?(RUBY_ENGINE) || RUBY_ENGINE == "ruby"
