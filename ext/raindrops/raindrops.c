@@ -9,6 +9,9 @@
 #ifndef SIZET2NUM
 #  define SIZET2NUM(x) ULONG2NUM(x)
 #endif
+#ifndef NUM2SIZET
+#  define NUM2SIZET(x) NUM2ULONG(x)
+#endif
 
 /*
  * most modern CPUs have a cache-line size of 64 or 128.
@@ -16,6 +19,10 @@
  * heavily used
  */
 static size_t raindrop_size = 128;
+static size_t rd_page_size;
+
+#define PAGE_MASK               (~(rd_page_size - 1))
+#define PAGE_ALIGN(addr)        (((addr) + rd_page_size - 1) & PAGE_MASK)
 
 /* each raindrop is a counter */
 struct raindrop {
@@ -25,16 +32,18 @@ struct raindrop {
 /* allow mmap-ed regions to store more than one raindrop */
 struct raindrops {
 	long size;
+	size_t capa;
+	pid_t pid;
 	struct raindrop *drops;
 };
 
 /* called by GC */
-static void evaporate(void *ptr)
+static void gcfree(void *ptr)
 {
 	struct raindrops *r = ptr;
 
-	if (r->drops) {
-		int rv = munmap(r->drops, raindrop_size * r->size);
+	if (r->drops != MAP_FAILED) {
+		int rv = munmap(r->drops, raindrop_size * r->capa);
 		if (rv != 0)
 			rb_bug("munmap failed in gc: %s", strerror(errno));
 	}
@@ -46,8 +55,10 @@ static void evaporate(void *ptr)
 static VALUE alloc(VALUE klass)
 {
 	struct raindrops *r;
+	VALUE rv = Data_Make_Struct(klass, struct raindrops, NULL, gcfree, r);
 
-	return Data_Make_Struct(klass, struct raindrops, NULL, evaporate, r);
+	r->drops = MAP_FAILED;
+	return rv;
 }
 
 static struct raindrops *get(VALUE self)
@@ -55,6 +66,9 @@ static struct raindrops *get(VALUE self)
 	struct raindrops *r;
 
 	Data_Get_Struct(self, struct raindrops, r);
+
+	if (r->drops == MAP_FAILED)
+		rb_raise(rb_eStandardError, "invalid or freed Raindrops");
 
 	return r;
 }
@@ -71,29 +85,115 @@ static struct raindrops *get(VALUE self)
  */
 static VALUE init(VALUE self, VALUE size)
 {
-	struct raindrops *r = get(self);
+	struct raindrops *r = DATA_PTR(self);
 	int tries = 1;
+	size_t tmp;
 
-	if (r->drops)
+	if (r->drops != MAP_FAILED)
 		rb_raise(rb_eRuntimeError, "already initialized");
 
 	r->size = NUM2LONG(size);
 	if (r->size < 1)
 		rb_raise(rb_eArgError, "size must be >= 1");
 
+	tmp = PAGE_ALIGN(raindrop_size * r->size);
+	r->capa = tmp / raindrop_size;
+	assert(PAGE_ALIGN(raindrop_size * r->capa) == tmp && "not aligned");
+
 retry:
-	r->drops = mmap(NULL, raindrop_size * r->size,
+	r->drops = mmap(NULL, tmp,
 	                PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
 	if (r->drops == MAP_FAILED) {
-		r->drops = NULL;
 		if ((errno == EAGAIN || errno == ENOMEM) && tries-- > 0) {
 			rb_gc();
 			goto retry;
 		}
 		rb_sys_fail("mmap");
 	}
+	r->pid = getpid();
 
 	return self;
+}
+
+/*
+ * mremap() is currently broken with MAP_SHARED
+ * https://bugzilla.kernel.org/show_bug.cgi?id=8691
+ */
+#if defined(HAVE_MREMAP) && !defined(MREMAP_WORKS_WITH_MAP_SHARED)
+#  undef HAVE_MREMAP
+#endif
+
+#ifdef HAVE_MREMAP
+#ifndef MREMAP_MAYMOVE
+#  warn MREMAP_MAYMOVE undefined
+#  define MREMAP_MAYMOVE 0
+#endif
+static void resize(struct raindrops *r, size_t new_rd_size)
+{
+	size_t old_size = raindrop_size * r->capa;
+	size_t new_size = PAGE_ALIGN(raindrop_size * new_rd_size);
+	void *old_address = r->drops;
+	void *rv;
+
+	if (r->pid != getpid())
+		rb_raise(rb_eRuntimeError, "cannot mremap() from child");
+
+	rv = mremap(old_address, old_size, new_size, MREMAP_MAYMOVE);
+	if (rv == MAP_FAILED) {
+		if (errno == EAGAIN || errno == ENOMEM) {
+			rb_gc();
+			rv = mremap(old_address, old_size, new_size, 0);
+		}
+		if (rv == MAP_FAILED)
+			rb_sys_fail("mremap");
+	}
+	r->drops = rv;
+	r->size = new_rd_size;
+	r->capa = new_size / raindrop_size;
+	assert(r->capa >= (size_t)r->size && "bad sizing");
+}
+#else /* ! HAVE_MREMAP */
+/*
+ * we cannot use munmap + mmap to reallocate the buffer since it may
+ * already be shared by other processes, so we just fail
+ */
+static void resize(struct raindrops *r, size_t new_capa)
+{
+	rb_raise(rb_eRangeError, "mremap(2) is not available");
+}
+#endif /* ! HAVE_MREMAP */
+
+/*
+ * call-seq:
+ *	rd.size = new_size
+ *
+ * Increases or decreases the current capacity of our Raindrop.
+ * Raises RangeError if +new_size+ is too big or small for the
+ * current backing store
+ */
+static VALUE setsize(VALUE self, VALUE new_size)
+{
+	size_t new_capa = NUM2SIZET(new_size);
+	struct raindrops *r = get(self);
+
+	if (new_capa <= r->capa)
+		r->size = new_capa;
+	else
+		resize(r, new_capa);
+
+	return new_capa;
+}
+
+/*
+ * call-seq:
+ *	rd.capa		-> Integer
+ *
+ * Returns the number of slots allocated (but not necessarily used) by
+ * the Raindrops object.
+ */
+static VALUE capa(VALUE self)
+{
+	return SIZET2NUM(get(self)->capa);
 }
 
 /*
@@ -104,7 +204,7 @@ retry:
  */
 static VALUE init_copy(VALUE dest, VALUE source)
 {
-	struct raindrops *dst = get(dest);
+	struct raindrops *dst = DATA_PTR(dest);
 	struct raindrops *src = get(source);
 
 	init(dest, LONG2NUM(src->size));
@@ -234,6 +334,26 @@ void Init_raindrops_linux_tcp_info(void);
 #  endif
 #endif
 
+/*
+ * call-seq:
+ *	rd.evaporate!	-> nil
+ *
+ * Releases mmap()-ed memory allocated for the Raindrops object back
+ * to the OS.  The Ruby garbage collector will also release memory
+ * automatically when it is not needed, but this forces release
+ * under high memory pressure.
+ */
+static VALUE evaporate_bang(VALUE self)
+{
+	struct raindrops *r = get(self);
+	void *addr = r->drops;
+
+	r->drops = MAP_FAILED;
+	if (munmap(addr, raindrop_size * r->capa) != 0)
+		rb_sys_fail("munmap");
+	return Qnil;
+}
+
 void Init_raindrops_ext(void)
 {
 	VALUE cRaindrops = rb_define_class("Raindrops", rb_cObject);
@@ -252,6 +372,29 @@ void Init_raindrops_ext(void)
 			raindrop_size = (size_t)tmp;
 	}
 #endif
+#if defined(_SC_PAGE_SIZE)
+	rd_page_size = (size_t)sysconf(_SC_PAGE_SIZE);
+#elif defined(_SC_PAGESIZE)
+	rd_page_size = (size_t)sysconf(_SC_PAGESIZE);
+#elif defined(HAVE_GETPAGESIZE)
+	rd_page_size = (size_t)getpagesize();
+#elif defined(PAGE_SIZE)
+	rd_page_size = (size_t)PAGE_SIZE;
+#elif defined(PAGESIZE)
+	rd_page_size = (size_t)PAGESIZE;
+#else
+#  error unable to detect page size for mmap()
+#endif
+	if ((rd_page_size == (size_t)-1) || (rd_page_size < raindrop_size))
+		rb_raise(rb_eRuntimeError,
+			 "system page size invalid: %llu",
+			 (unsigned long long)rd_page_size);
+
+	/*
+	 * The size of one page of memory for a mmap()-ed Raindrops region.
+	 * Typically 4096 bytes under Linux.
+	 */
+	rb_define_const(cRaindrops, "PAGE_SIZE", SIZET2NUM(rd_page_size));
 
 	/*
 	 * The size (in bytes) of a slot in a Raindrops object.
@@ -276,7 +419,10 @@ void Init_raindrops_ext(void)
 	rb_define_method(cRaindrops, "[]", aref, 1);
 	rb_define_method(cRaindrops, "[]=", aset, 2);
 	rb_define_method(cRaindrops, "size", size, 0);
+	rb_define_method(cRaindrops, "size=", setsize, 1);
+	rb_define_method(cRaindrops, "capa", capa, 0);
 	rb_define_method(cRaindrops, "initialize_copy", init_copy, 1);
+	rb_define_method(cRaindrops, "evaporate!", evaporate_bang, 0);
 
 #ifdef __linux__
 	Init_raindrops_linux_inet_diag();

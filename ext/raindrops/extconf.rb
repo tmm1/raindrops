@@ -3,6 +3,11 @@ require 'mkmf'
 have_func('mmap', 'sys/mman.h') or abort 'mmap() not found'
 have_func('munmap', 'sys/mman.h') or abort 'munmap() not found'
 
+$CPPFLAGS += " -D_GNU_SOURCE "
+have_func('mremap', 'sys/mman.h')
+
+$CPPFLAGS += " -D_BSD_SOURCE -D_XOPEN_SOURCE=600 "
+have_func("getpagesize", "unistd.h")
 have_func("rb_struct_alloc_noinit")
 have_func('rb_thread_blocking_region')
 

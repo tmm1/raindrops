@@ -16,9 +16,15 @@ class TestRaindrops < Test::Unit::TestCase
     puts "Raindrops::SIZE = #{Raindrops::SIZE}"
   end
 
-  def test_size
+  def test_page_size
+    assert_kind_of Integer, Raindrops::PAGE_SIZE
+    assert Raindrops::PAGE_SIZE > Raindrops::SIZE
+  end
+
+  def test_size_and_capa
     rd = Raindrops.new(4)
     assert_equal 4, rd.size
+    assert rd.capa >= rd.size
   end
 
   def test_ary
@@ -104,4 +110,36 @@ class TestRaindrops < Test::Unit::TestCase
     assert_equal expect, rd.to_ary
   end
 
+  def test_resize
+    rd = Raindrops.new(4)
+    assert_equal 4, rd.size
+    assert_equal rd.capa, rd.size = rd.capa
+    assert_equal rd.capa, rd.to_ary.size
+    assert_equal 0, rd[rd.capa - 1]
+    assert_equal 1, rd.incr(rd.capa - 1)
+    assert_raises(ArgumentError) { rd[rd.capa] }
+  end
+
+  def test_resize_mremap
+    rd = Raindrops.new(4)
+    assert_equal 4, rd.size
+    old_capa = rd.capa
+    rd.size = rd.capa + 1
+    assert_equal old_capa * 2, rd.capa
+
+    # mremap() is currently broken with MAP_SHARED
+    # https://bugzilla.kernel.org/show_bug.cgi?id=8691
+    assert_equal 0, rd[old_capa]
+    assert_equal rd.capa, rd.to_ary.size
+    assert_equal 0, rd[rd.capa - 1]
+    assert_equal 1, rd.incr(rd.capa - 1)
+    assert_raises(ArgumentError) { rd[rd.capa] }
+    rescue RangeError
+  end # if RUBY_PLATFORM =~ /linux/
+
+  def test_evaporate
+    rd = Raindrops.new 1
+    assert_nil rd.evaporate!
+    assert_raises(StandardError) { rd.evaporate! }
+  end
 end
