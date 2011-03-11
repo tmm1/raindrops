@@ -108,70 +108,93 @@ static const char err_sendmsg[] = "sendmsg";
 static const char err_recvmsg[] = "recvmsg";
 static const char err_nlmsg[] = "nlmsg";
 
+struct diag_req {
+	struct nlmsghdr nlh;
+	struct inet_diag_req r;
+};
+
+static void prep_msghdr(
+	struct msghdr *msg,
+	struct nogvl_args *args,
+	struct sockaddr_nl *nladdr)
+{
+	memset(msg, 0, sizeof(struct msghdr));
+	msg->msg_name = (void *)nladdr;
+	msg->msg_namelen = sizeof(struct sockaddr_nl);
+	msg->msg_iov = args->iov;
+	msg->msg_iovlen = 3;
+}
+
+static void prep_diag_args(
+	struct nogvl_args *args,
+	struct sockaddr_nl *nladdr,
+	struct rtattr *rta,
+	struct diag_req *req,
+	struct msghdr *msg)
+{
+	memset(&args->stats, 0, sizeof(struct listen_stats));
+	memset(req, 0, sizeof(struct diag_req));
+	memset(nladdr, 0, sizeof(struct sockaddr_nl));
+
+	nladdr->nl_family = AF_NETLINK;
+
+	req->nlh.nlmsg_len = sizeof(struct diag_req) +
+	                    RTA_LENGTH(args->iov[2].iov_len);
+	req->nlh.nlmsg_type = TCPDIAG_GETSOCK;
+	req->nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
+	req->nlh.nlmsg_pid = getpid();
+	req->r.idiag_states = (1<<TCP_ESTABLISHED) | (1<<TCP_LISTEN);
+	rta->rta_type = INET_DIAG_REQ_BYTECODE;
+	rta->rta_len = RTA_LENGTH(args->iov[2].iov_len);
+
+	args->iov[0].iov_base = req;
+	args->iov[0].iov_len = sizeof(struct diag_req);
+	args->iov[1].iov_base = rta;
+	args->iov[1].iov_len = sizeof(struct rtattr);
+
+	prep_msghdr(msg, args, nladdr);
+}
+
+static void prep_recvmsg_buf(struct nogvl_args *args)
+{
+	/* reuse buffer that was allocated for bytecode */
+	args->iov[0].iov_len = page_size;
+	args->iov[0].iov_base = args->iov[2].iov_base;
+}
+
 /* does the inet_diag stuff with netlink(), this is called w/o GVL */
 static VALUE diag(void *ptr)
 {
+	struct inet_diag_bc_op *op;
+	struct inet_diag_hostcond *cond;
 	struct nogvl_args *args = ptr;
 	struct sockaddr_nl nladdr;
 	struct rtattr rta;
-	struct {
-		struct nlmsghdr nlh;
-		struct inet_diag_req r;
-	} req;
+	struct diag_req req;
 	struct msghdr msg;
 	const char *err = NULL;
-	unsigned seq = ++g_seq; /* not atomic, rely on GVL for now */
+	unsigned seq = ++g_seq;
 	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
 
 	if (fd < 0)
 		return (VALUE)err_socket;
 
-	memset(&args->stats, 0, sizeof(struct listen_stats));
-
-	memset(&nladdr, 0, sizeof(nladdr));
-	nladdr.nl_family = AF_NETLINK;
-
-	memset(&req, 0, sizeof(req));
-	req.nlh.nlmsg_len = sizeof(req) + RTA_LENGTH(args->iov[2].iov_len);
-	req.nlh.nlmsg_type = TCPDIAG_GETSOCK;
-	req.nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
-	req.nlh.nlmsg_pid = getpid();
+	prep_diag_args(args, &nladdr, &rta, &req, &msg);
+	op = args->iov->iov_base;
+	cond = (struct inet_diag_hostcond *)(op + 1);
+	req.r.idiag_family = cond->family;
 	req.nlh.nlmsg_seq = seq;
-	req.r.idiag_family = AF_INET | AF_INET6;
-	req.r.idiag_states = (1<<TCP_ESTABLISHED) | (1<<TCP_LISTEN);
-	rta.rta_type = INET_DIAG_REQ_BYTECODE;
-	rta.rta_len = RTA_LENGTH(args->iov[2].iov_len);
-
-	args->iov[0].iov_base = &req;
-	args->iov[0].iov_len = sizeof(req);
-	args->iov[1].iov_base = &rta;
-	args->iov[1].iov_len = sizeof(rta);
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (void *)&nladdr;
-	msg.msg_namelen = sizeof(nladdr);
-	msg.msg_iov = args->iov;
-	msg.msg_iovlen = 3;
-
 	if (sendmsg(fd, &msg, 0) < 0) {
 		err = err_sendmsg;
 		goto out;
 	}
-
-	/* reuse buffer that was allocated for bytecode */
-	args->iov[0].iov_len = page_size;
-	args->iov[0].iov_base = args->iov[2].iov_base;
+	prep_recvmsg_buf(args);
 
 	while (1) {
 		ssize_t readed;
 		struct nlmsghdr *h = (struct nlmsghdr *)args->iov[0].iov_base;
 
-		memset(&msg, 0, sizeof(msg));
-		msg.msg_name = (void *)&nladdr;
-		msg.msg_namelen = sizeof(nladdr);
-		msg.msg_iov = args->iov;
-		msg.msg_iovlen = 1;
-
+		prep_msghdr(&msg, args, &nladdr);
 		readed = recvmsg(fd, &msg, 0);
 		if (readed < 0) {
 			if (errno == EINTR)
