@@ -157,7 +157,7 @@ static void resize(struct raindrops *r, size_t new_rd_size)
  * we cannot use munmap + mmap to reallocate the buffer since it may
  * already be shared by other processes, so we just fail
  */
-static void resize(struct raindrops *r, size_t new_capa)
+static void resize(struct raindrops *r, size_t new_rd_size)
 {
 	rb_raise(rb_eRangeError, "mremap(2) is not available");
 }
@@ -173,15 +173,15 @@ static void resize(struct raindrops *r, size_t new_capa)
  */
 static VALUE setsize(VALUE self, VALUE new_size)
 {
-	size_t new_capa = NUM2SIZET(new_size);
+	size_t new_rd_size = NUM2SIZET(new_size);
 	struct raindrops *r = get(self);
 
-	if (new_capa <= r->capa)
-		r->size = new_capa;
+	if (new_rd_size <= r->capa)
+		r->size = new_rd_size;
 	else
-		resize(r, new_capa);
+		resize(r, new_rd_size);
 
-	return new_capa;
+	return new_size;
 }
 
 /*
