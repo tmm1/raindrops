@@ -4,6 +4,5 @@ NEWS
 ChangeLog
 lib
 ext/raindrops/raindrops.c
-ext/raindrops/raindrops_ext.c
 ext/raindrops/linux_inet_diag.c
 ext/raindrops/linux_tcp_info.c
