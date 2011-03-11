@@ -62,7 +62,6 @@ struct listen_stats {
 
 struct nogvl_args {
 	struct iovec iov[3]; /* last iov holds inet_diag bytecode */
-	struct sockaddr_storage query_addr;
 	struct listen_stats stats;
 };
 
@@ -325,9 +324,10 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 {
 	const char *err;
 	VALUE verr;
+	struct sockaddr_storage query_addr;
 
-	parse_addr(&args->query_addr, addr);
-	gen_bytecode(&args->iov[2], &args->query_addr);
+	parse_addr(&query_addr, addr);
+	gen_bytecode(&args->iov[2], &query_addr);
 
 	verr = rb_thread_blocking_region(diag, args, RUBY_UBF_IO, 0);
 	err = (const char *)verr;
