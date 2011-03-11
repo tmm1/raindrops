@@ -184,10 +184,12 @@ static VALUE diag(void *ptr)
 	cond = (struct inet_diag_hostcond *)(op + 1);
 	req.r.idiag_family = cond->family;
 	req.nlh.nlmsg_seq = seq;
+
 	if (sendmsg(fd, &msg, 0) < 0) {
 		err = err_sendmsg;
 		goto out;
 	}
+
 	prep_recvmsg_buf(args);
 
 	while (1) {
@@ -315,7 +317,7 @@ static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
 		}
 		break;
 	default:
-		assert("unsupported address family, could that be IPv7?!");
+		assert(0 && "unsupported address family, could that be IPv7?!");
 	}
 }
 
