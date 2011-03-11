@@ -142,4 +142,24 @@ class TestRaindrops < Test::Unit::TestCase
     assert_nil rd.evaporate!
     assert_raises(StandardError) { rd.evaporate! }
   end
+
+  def test_evaporate_with_fork
+    tmp = Raindrops.new 2
+    pid = fork do
+      tmp.incr 0
+      exit(tmp.evaporate! == nil)
+    end
+    _, status = Process.waitpid2(pid)
+    assert status.success?
+    assert_equal [ 1, 0 ], tmp.to_ary
+    tmp.incr 1
+    assert_equal [ 1, 1 ], tmp.to_ary
+    pid = fork do
+      tmp.incr 1
+      exit([ 1, 2 ] == tmp.to_ary)
+    end
+    _, status = Process.waitpid2(pid)
+    assert status.success?
+    assert_equal [ 1, 2 ], tmp.to_ary
+  end
 end
