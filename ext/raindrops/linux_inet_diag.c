@@ -130,6 +130,12 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		in->sin_port = r->id.idiag_sport;
 		in->sin_addr.s_addr = r->id.idiag_src[0];
 		keylen = INET_ADDRSTRLEN;
+		key = alloca(keylen + 1 + portlen);
+		key[keylen] = 0; /* will be ':' later */
+		port = key + keylen + 1;
+		rc = getnameinfo((struct sockaddr *)&ss, len,
+				 key, keylen, port, portlen, flags);
+
 		break;
 		}
 	case AF_INET6: {
@@ -138,16 +144,18 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		memcpy(&in6->sin6_addr.in6_u.u6_addr32,
 		       &r->id.idiag_src, sizeof(__be32[4]));
 		keylen = INET6_ADDRSTRLEN;
+		          /* [            ] */
+		key = alloca(1 + keylen + 1 + 1 + portlen);
+		*key = '[';
+		key[1 + keylen + 1] = 0; /* will be ':' later */
+		port = 1 + key + keylen + 1 + 1;
+		rc = getnameinfo((struct sockaddr *)&ss, len,
+				 key + 1, keylen, port, portlen, flags);
 		break;
 		}
 	default:
 		assert(0 && "unsupported address family, could that be IPv7?!");
 	}
-	key = alloca(keylen + 1 + portlen);
-	key[keylen] = 0; /* will be ':' later */
-	port = key + keylen + 1;
-	rc = getnameinfo((struct sockaddr *)&ss, len,
-			 key, keylen, port, portlen, flags);
 	if (rc != 0) {
 		fprintf(stderr, "BUG: getnameinfo: %s\n"
 		        "Please report how you produced this at %s\n",
@@ -155,10 +163,24 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		fflush(stderr);
 		*key = 0;
 	}
+
 	keylen = strlen(key);
 	portlen = strlen(port);
-	key[keylen] = ':';
-	memmove(key + keylen + 1, port, portlen + 1);
+
+	switch (ss.ss_family) {
+	case AF_INET:
+		key[keylen] = ':';
+		memmove(key + keylen + 1, port, portlen + 1);
+		break;
+	case AF_INET6:
+		key[keylen] = ']';
+		key[keylen + 1] = ':';
+		memmove(key + keylen + 2, port, portlen + 1);
+		break;
+	default:
+		assert(0 && "unsupported address family, could that be IPv7?!");
+	}
+
 	if (!st_lookup(table, (st_data_t)key, (st_data_t *)&stats)) {
 		char *old_key = key;
 
@@ -470,18 +492,6 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 	return rb_listen_stats(&args->stats);
 }
 
-/* this is slow with multiple addresses */
-static VALUE ipv6_fallback(struct nogvl_args *args, VALUE addrs)
-{
-	VALUE *ary = RARRAY_PTR(addrs);
-	long i;
-	VALUE rv = rb_hash_new();
-
-	for (i = RARRAY_LEN(addrs); --i >= 0; ary++)
-		rb_hash_aset(rv, *ary, tcp_stats(args, *ary));
-	return rv;
-}
-
 /*
  * call-seq:
  *      Raindrops::Linux.tcp_listener_stats([addrs]) => hash
@@ -528,8 +538,6 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 			struct sockaddr_storage check;
 
 			parse_addr(&check, *ary);
-			if (check.ss_family == AF_INET6)
-				return ipv6_fallback(&args, addrs);
 			rb_hash_aset(rv, *ary, Qtrue);
 		}
 		/* fall through */
