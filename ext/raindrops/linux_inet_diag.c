@@ -1,4 +1,9 @@
 #include <ruby.h>
+#ifdef HAVE_RUBY_ST_H
+#  include <ruby/st.h>
+#else
+#  include <st.h>
+#endif
 #ifdef __linux__
 
 /* Ruby 1.8.6+ macros (for compatibility with Ruby 1.9) */
@@ -48,7 +53,8 @@ static VALUE cListenStats;
 
 struct listen_stats {
 	uint32_t active;
-	uint32_t queued;
+	uint32_t listener_p:1;
+	uint32_t queued:31;
 };
 
 #define OPLEN (sizeof(struct inet_diag_bc_op) + \
@@ -56,6 +62,7 @@ struct listen_stats {
 	       sizeof(struct sockaddr_storage))
 
 struct nogvl_args {
+	st_table *table;
 	struct iovec iov[3]; /* last iov holds inet_diag bytecode */
 	struct listen_stats stats;
 };
@@ -69,6 +76,76 @@ static VALUE rb_listen_stats(struct listen_stats *stats)
 	return rb_struct_new(cListenStats, active, queued);
 }
 
+static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
+{
+	char *key, *port;
+	struct listen_stats *stats;
+	size_t keylen;
+	size_t portlen = sizeof("65535");
+	struct sockaddr_storage ss = { 0 };
+	socklen_t len = sizeof(struct sockaddr_storage);
+	int rc;
+	int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+
+	switch ((ss.ss_family = r->idiag_family)) {
+	case AF_INET: {
+		struct sockaddr_in *in = (struct sockaddr_in *)&ss;
+		in->sin_port = r->id.idiag_sport;
+		in->sin_addr.s_addr = r->id.idiag_src[0];
+		keylen = INET_ADDRSTRLEN;
+		break;
+		}
+	case AF_INET6: {
+		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)&ss;
+		in6->sin6_port = r->id.idiag_sport;
+		memcpy(&in6->sin6_addr.in6_u.u6_addr32,
+		       &r->id.idiag_src, sizeof(__be32[4]));
+		keylen = INET6_ADDRSTRLEN;
+		break;
+		}
+	default:
+		assert(0 && "unsupported address family, could that be IPv7?!");
+	}
+	key = alloca(keylen + 1 + portlen);
+	key[keylen] = 0; /* will be ':' later */
+	port = key + keylen + 1;
+	rc = getnameinfo((struct sockaddr *)&ss, len,
+			 key, keylen, port, portlen, flags);
+	if (rc != 0) {
+		fprintf(stderr, "BUG: getnameinfo: %s\n"
+		        "Please report how you produced this at %s\n",
+		        gai_strerror(rc), "raindrops@librelist.com");
+		fflush(stderr);
+		*key = 0;
+	}
+	keylen = strlen(key);
+	portlen = strlen(port);
+	key[keylen] = ':';
+	memmove(key + keylen + 1, port, portlen + 1);
+	if (!st_lookup(table, (st_data_t)key, (st_data_t *)&stats)) {
+		char *old_key = key;
+
+		key = xmalloc(keylen + 1 + portlen + 1);
+		memcpy(key, old_key, keylen + 1 + portlen + 1);
+		stats = xcalloc(1, sizeof(struct listen_stats));
+		st_insert(table, (st_data_t)key, (st_data_t)stats);
+	}
+	return stats;
+}
+
+static void table_incr_active(st_table *table, struct inet_diag_msg *r)
+{
+	struct listen_stats *stats = stats_for(table, r);
+	++stats->active;
+}
+
+static void table_set_queued(st_table *table, struct inet_diag_msg *r)
+{
+	struct listen_stats *stats = stats_for(table, r);
+	stats->listener_p = 1;
+	stats->queued = r->idiag_rqueue;
+}
+
 /* inner loop of inet_diag, called for every socket returned by netlink */
 static inline void r_acc(struct nogvl_args *args, struct inet_diag_msg *r)
 {
@@ -79,10 +156,17 @@ static inline void r_acc(struct nogvl_args *args, struct inet_diag_msg *r)
 	 */
 	if (r->idiag_inode == 0)
 		return;
-	if (r->idiag_state == TCP_ESTABLISHED)
-		args->stats.active++;
-	else /* if (r->idiag_state == TCP_LISTEN) */
-		args->stats.queued = r->idiag_rqueue;
+	if (r->idiag_state == TCP_ESTABLISHED) {
+		if (args->table)
+			table_incr_active(args->table, r);
+		else
+			args->stats.active++;
+	} else { /* if (r->idiag_state == TCP_LISTEN) */
+		if (args->table)
+			table_set_queued(args->table, r);
+		else
+			args->stats.queued = r->idiag_rqueue;
+	}
 	/*
 	 * we wont get anything else because of the idiag_states filter
 	 */
@@ -305,24 +389,27 @@ static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
 	}
 }
 
-static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
+static void nl_errcheck(VALUE r)
 {
-	const char *err;
-	VALUE verr;
-	struct sockaddr_storage query_addr;
+	const char *err = (const char *)r;
 
-	parse_addr(&query_addr, addr);
-	gen_bytecode(&args->iov[2], &query_addr);
-
-	memset(&args->stats, 0, sizeof(struct listen_stats));
-	verr = rb_thread_blocking_region(diag, args, RUBY_UBF_IO, 0);
-	err = (const char *)verr;
 	if (err) {
 		if (err == err_nlmsg)
 			rb_raise(rb_eRuntimeError, "NLMSG_ERROR");
 		else
 			rb_sys_fail(err);
 	}
+}
+
+static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
+{
+	struct sockaddr_storage query_addr;
+
+	parse_addr(&query_addr, addr);
+	gen_bytecode(&args->iov[2], &query_addr);
+
+	memset(&args->stats, 0, sizeof(struct listen_stats));
+	nl_errcheck(rb_thread_blocking_region(diag, args, RUBY_UBF_IO, 0));
 
 	return rb_listen_stats(&args->stats);
 }
@@ -350,6 +437,7 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 	 */
 	args.iov[2].iov_len = OPLEN;
 	args.iov[2].iov_base = alloca(page_size);
+	args.table = NULL;
 
 	if (TYPE(addrs) != T_ARRAY)
 		rb_raise(rb_eArgError, "addrs must be an Array of Strings");
@@ -362,6 +450,75 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 	return rv;
 }
 
+static int st_free_data(st_data_t key, st_data_t value, st_data_t ignored)
+{
+	xfree((void *)key);
+	xfree((void *)value);
+
+	return ST_DELETE;
+}
+
+static int st_to_hash(st_data_t key, st_data_t value, VALUE hash)
+{
+	struct listen_stats *stats = (struct listen_stats *)value;
+
+	if (stats->listener_p) {
+		VALUE k = rb_str_new2((const char *)key);
+		VALUE v = rb_listen_stats(stats);
+
+		OBJ_FREEZE(k);
+		rb_hash_aset(hash, k, v);
+	}
+	return st_free_data(key, value, 0);
+}
+
+/* generates inet_diag bytecode to match all addrs for a given family */
+static void gen_bytecode_all(struct iovec *iov, sa_family_t family)
+{
+	struct inet_diag_bc_op *op;
+	struct inet_diag_hostcond *cond;
+
+	/* iov_len was already set and base allocated in a parent function */
+	assert(iov->iov_len == OPLEN && iov->iov_base && "iov invalid");
+	op = iov->iov_base;
+	op->code = INET_DIAG_BC_S_COND;
+	op->yes = OPLEN;
+	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
+	cond = (struct inet_diag_hostcond *)(op + 1);
+	cond->family = family;
+	cond->port = -1;
+	cond->prefix_len = 0;
+}
+
+static VALUE all_tcp_listener_stats(VALUE obj)
+{
+	VALUE rv;
+	struct nogvl_args args;
+
+	/*
+	 * allocating page_size instead of OP_LEN since we'll reuse the
+	 * buffer for recvmsg() later, we already checked for
+	 * OPLEN <= page_size at initialization
+	 */
+	args.iov[2].iov_len = OPLEN;
+	args.iov[2].iov_base = alloca(page_size);
+	args.table = st_init_strtable();
+	gen_bytecode_all(&args.iov[2], AF_INET);
+
+	rv = rb_thread_blocking_region(diag, &args, RUBY_UBF_IO, 0);
+	if (rv != (VALUE)0) {
+		int save_errno = errno;
+		st_foreach(args.table, st_free_data, 0);
+		st_free_table(args.table);
+		errno = save_errno;
+		nl_errcheck(rv);
+	}
+	rv = rb_hash_new();
+	st_foreach(args.table, st_to_hash, rv);
+	st_free_table(args.table);
+	return rv;
+}
+
 void Init_raindrops_linux_inet_diag(void)
 {
 	VALUE cRaindrops = rb_const_get(rb_cObject, rb_intern("Raindrops"));
@@ -371,6 +528,8 @@ void Init_raindrops_linux_inet_diag(void)
 
 	rb_define_module_function(mLinux, "tcp_listener_stats",
 	                          tcp_listener_stats, 1);
+	rb_define_module_function(mLinux, "all_tcp_listener_stats",
+	                          all_tcp_listener_stats, 0);
 
 	page_size = getpagesize();
 
