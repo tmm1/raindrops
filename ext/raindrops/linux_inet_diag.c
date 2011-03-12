@@ -14,7 +14,6 @@
 /* partial emulation of the 1.9 rb_thread_blocking_region under 1.8 */
 #ifndef HAVE_RB_THREAD_BLOCKING_REGION
 #  include <rubysig.h>
-#  define RUBY_UBF_IO ((rb_unblock_function_t *)-1)
 typedef void rb_unblock_function_t(void *);
 typedef VALUE rb_blocking_function_t(void *);
 static VALUE
@@ -420,7 +419,7 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 	gen_bytecode(&args->iov[2], &query_addr);
 
 	memset(&args->stats, 0, sizeof(struct listen_stats));
-	nl_errcheck(rb_thread_blocking_region(diag, args, RUBY_UBF_IO, 0));
+	nl_errcheck(rb_thread_blocking_region(diag, args, 0, 0));
 
 	return rb_listen_stats(&args->stats);
 }
@@ -508,7 +507,7 @@ static VALUE all_tcp_listener_stats(VALUE obj)
 	args.table = st_init_strtable();
 	gen_bytecode_all(&args.iov[2], AF_INET);
 
-	nl_errcheck(rb_thread_blocking_region(diag, &args, RUBY_UBF_IO, 0));
+	nl_errcheck(rb_thread_blocking_region(diag, &args, NULL, 0));
 	rv = rb_hash_new();
 	st_foreach(args.table, st_to_hash, rv);
 	st_free_table(args.table);
