@@ -96,6 +96,11 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 1, stats[addr2].active
   end
 
+  def test_invalid_addresses
+    assert_raises(ArgumentError) { tcp_listener_stats(%w([1:::5)) }
+    assert_raises(ArgumentError) { tcp_listener_stats(%w([1:::]5)) }
+  end
+
   # tries to overflow buffers
   def test_tcp_stress_test
     nr_proc = 32

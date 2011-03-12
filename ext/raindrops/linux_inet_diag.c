@@ -315,15 +315,15 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	if (*host_ptr == '[') { /* ipv6 address format (rfc2732) */
 		rbracket = memchr(host_ptr + 1, ']', host_len - 1);
 
-		if (rbracket) {
-			if (rbracket[1] == ':') {
-				colon = rbracket + 1;
-				host_ptr++;
-				*rbracket = 0;
-			} else {
-				rbracket = NULL;
-			}
-		}
+		if (rbracket == NULL)
+			rb_raise(rb_eArgError, "']' not found in IPv6 addr=%s",
+			         host_ptr);
+		if (rbracket[1] != ':')
+			rb_raise(rb_eArgError, "':' not found in IPv6 addr=%s",
+			         host_ptr);
+		colon = rbracket + 1;
+		host_ptr++;
+		*rbracket = 0;
 	} else { /* ipv4 */
 		colon = memchr(host_ptr, ':', host_len);
 	}
@@ -337,7 +337,6 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
 
 	*colon = 0;
-	if (rbracket) *rbracket = 0;
 	rc = getaddrinfo(host_ptr, colon + 1, &hints, &res);
 	*colon = ':';
 	if (rbracket) *rbracket = ']';
