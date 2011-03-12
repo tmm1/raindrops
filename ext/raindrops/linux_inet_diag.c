@@ -76,6 +76,14 @@ static VALUE rb_listen_stats(struct listen_stats *stats)
 	return rb_struct_new(cListenStats, active, queued);
 }
 
+static int st_free_data(st_data_t key, st_data_t value, st_data_t ignored)
+{
+	xfree((void *)key);
+	xfree((void *)value);
+
+	return ST_DELETE;
+}
+
 static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 {
 	char *key, *port;
@@ -291,6 +299,10 @@ out:
 	{
 		int save_errno = errno;
 		close(fd);
+		if (err && args->table) {
+			st_foreach(args->table, st_free_data, 0);
+			st_free_table(args->table);
+		}
 		errno = save_errno;
 	}
 	return (VALUE)err;
@@ -449,14 +461,6 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 	return rv;
 }
 
-static int st_free_data(st_data_t key, st_data_t value, st_data_t ignored)
-{
-	xfree((void *)key);
-	xfree((void *)value);
-
-	return ST_DELETE;
-}
-
 static int st_to_hash(st_data_t key, st_data_t value, VALUE hash)
 {
 	struct listen_stats *stats = (struct listen_stats *)value;
@@ -504,14 +508,7 @@ static VALUE all_tcp_listener_stats(VALUE obj)
 	args.table = st_init_strtable();
 	gen_bytecode_all(&args.iov[2], AF_INET);
 
-	rv = rb_thread_blocking_region(diag, &args, RUBY_UBF_IO, 0);
-	if (rv != (VALUE)0) {
-		int save_errno = errno;
-		st_foreach(args.table, st_free_data, 0);
-		st_free_table(args.table);
-		errno = save_errno;
-		nl_errcheck(rv);
-	}
+	nl_errcheck(rb_thread_blocking_region(diag, &args, RUBY_UBF_IO, 0));
 	rv = rb_hash_new();
 	st_foreach(args.table, st_to_hash, rv);
 	st_free_table(args.table);
