@@ -101,13 +101,14 @@ struct diag_req {
 static void prep_msghdr(
 	struct msghdr *msg,
 	struct nogvl_args *args,
-	struct sockaddr_nl *nladdr)
+	struct sockaddr_nl *nladdr,
+	size_t iovlen)
 {
 	memset(msg, 0, sizeof(struct msghdr));
 	msg->msg_name = (void *)nladdr;
 	msg->msg_namelen = sizeof(struct sockaddr_nl);
 	msg->msg_iov = args->iov;
-	msg->msg_iovlen = 3;
+	msg->msg_iovlen = iovlen;
 }
 
 static void prep_diag_args(
@@ -117,7 +118,9 @@ static void prep_diag_args(
 	struct diag_req *req,
 	struct msghdr *msg)
 {
-	memset(&args->stats, 0, sizeof(struct listen_stats));
+	struct inet_diag_bc_op *op = args->iov[2].iov_base;
+	struct inet_diag_hostcond *cond = (struct inet_diag_hostcond *)(op + 1);
+
 	memset(req, 0, sizeof(struct diag_req));
 	memset(nladdr, 0, sizeof(struct sockaddr_nl));
 
@@ -129,6 +132,7 @@ static void prep_diag_args(
 	req->nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
 	req->nlh.nlmsg_pid = getpid();
 	req->r.idiag_states = (1<<TCP_ESTABLISHED) | (1<<TCP_LISTEN);
+	req->r.idiag_family = cond->family;
 	rta->rta_type = INET_DIAG_REQ_BYTECODE;
 	rta->rta_len = RTA_LENGTH(args->iov[2].iov_len);
 
@@ -137,7 +141,7 @@ static void prep_diag_args(
 	args->iov[1].iov_base = rta;
 	args->iov[1].iov_len = sizeof(struct rtattr);
 
-	prep_msghdr(msg, args, nladdr);
+	prep_msghdr(msg, args, nladdr, 3);
 }
 
 static void prep_recvmsg_buf(struct nogvl_args *args)
@@ -150,8 +154,6 @@ static void prep_recvmsg_buf(struct nogvl_args *args)
 /* does the inet_diag stuff with netlink(), this is called w/o GVL */
 static VALUE diag(void *ptr)
 {
-	struct inet_diag_bc_op *op;
-	struct inet_diag_hostcond *cond;
 	struct nogvl_args *args = ptr;
 	struct sockaddr_nl nladdr;
 	struct rtattr rta;
@@ -165,9 +167,6 @@ static VALUE diag(void *ptr)
 		return (VALUE)err_socket;
 
 	prep_diag_args(args, &nladdr, &rta, &req, &msg);
-	op = args->iov->iov_base;
-	cond = (struct inet_diag_hostcond *)(op + 1);
-	req.r.idiag_family = cond->family;
 	req.nlh.nlmsg_seq = seq;
 
 	if (sendmsg(fd, &msg, 0) < 0) {
@@ -181,7 +180,7 @@ static VALUE diag(void *ptr)
 		ssize_t readed;
 		struct nlmsghdr *h = (struct nlmsghdr *)args->iov[0].iov_base;
 
-		prep_msghdr(&msg, args, &nladdr);
+		prep_msghdr(&msg, args, &nladdr, 1);
 		readed = recvmsg(fd, &msg, 0);
 		if (readed < 0) {
 			if (errno == EINTR)
@@ -315,6 +314,7 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 	parse_addr(&query_addr, addr);
 	gen_bytecode(&args->iov[2], &query_addr);
 
+	memset(&args->stats, 0, sizeof(struct listen_stats));
 	verr = rb_thread_blocking_region(diag, args, RUBY_UBF_IO, 0);
 	err = (const char *)verr;
 	if (err) {
