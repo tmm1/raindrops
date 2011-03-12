@@ -47,8 +47,8 @@ static unsigned g_seq;
 static VALUE cListenStats;
 
 struct listen_stats {
-	unsigned long active;
-	unsigned long queued;
+	uint32_t active;
+	uint32_t queued;
 };
 
 #define OPLEN (sizeof(struct inet_diag_bc_op) + \
@@ -63,8 +63,8 @@ struct nogvl_args {
 /* creates a Ruby ListenStats Struct based on our internal listen_stats */
 static VALUE rb_listen_stats(struct listen_stats *stats)
 {
-	VALUE active = ULONG2NUM(stats->active);
-	VALUE queued = ULONG2NUM(stats->queued);
+	VALUE active = UINT2NUM(stats->active);
+	VALUE queued = UINT2NUM(stats->queued);
 
 	return rb_struct_new(cListenStats, active, queued);
 }
