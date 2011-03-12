@@ -2,14 +2,9 @@
 #ifdef __linux__
 
 /* Ruby 1.8.6+ macros (for compatibility with Ruby 1.9) */
-#ifndef RSTRING_PTR
-#  define RSTRING_PTR(s) (RSTRING(s)->ptr)
-#endif
 #ifndef RSTRING_LEN
 #  define RSTRING_LEN(s) (RSTRING(s)->len)
 #endif
-
-#include "rstruct_19.h"
 
 /* partial emulation of the 1.9 rb_thread_blocking_region under 1.8 */
 #ifndef HAVE_RB_THREAD_BLOCKING_REGION
@@ -68,19 +63,10 @@ struct nogvl_args {
 /* creates a Ruby ListenStats Struct based on our internal listen_stats */
 static VALUE rb_listen_stats(struct listen_stats *stats)
 {
-	VALUE rv = rb_struct_alloc_noinit(cListenStats);
 	VALUE active = ULONG2NUM(stats->active);
 	VALUE queued = ULONG2NUM(stats->queued);
 
-#ifdef RSTRUCT_PTR
-	VALUE *ptr = RSTRUCT_PTR(rv);
-	ptr[0] = active;
-	ptr[1] = queued;
-#else /* Rubinius */
-	rb_funcall(rv, rb_intern("active="), 1, active);
-	rb_funcall(rv, rb_intern("queued="), 1, queued);
-#endif /* ! Rubinius */
-	return rv;
+	return rb_struct_new(cListenStats, active, queued);
 }
 
 /* inner loop of inet_diag, called for every socket returned by netlink */
@@ -386,9 +372,6 @@ void Init_raindrops_linux_inet_diag(void)
 	rb_define_module_function(mLinux, "tcp_listener_stats",
 	                          tcp_listener_stats, 1);
 
-#ifndef HAVE_RB_STRUCT_ALLOC_NOINIT
-	id_new = rb_intern("new");
-#endif
 	page_size = getpagesize();
 
 	assert(OPLEN <= page_size && "bytecode OPLEN is not <= PAGE_SIZE");
