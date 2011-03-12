@@ -52,8 +52,8 @@ static unsigned g_seq;
 static VALUE cListenStats;
 
 struct listen_stats {
-	long active;
-	long queued;
+	unsigned long active;
+	unsigned long queued;
 };
 
 #define OPLEN (sizeof(struct inet_diag_bc_op) + \
@@ -69,8 +69,8 @@ struct nogvl_args {
 static VALUE rb_listen_stats(struct listen_stats *stats)
 {
 	VALUE rv = rb_struct_alloc_noinit(cListenStats);
-	VALUE active = LONG2NUM(stats->active);
-	VALUE queued = LONG2NUM(stats->queued);
+	VALUE active = ULONG2NUM(stats->active);
+	VALUE queued = ULONG2NUM(stats->queued);
 
 #ifdef RSTRUCT_PTR
 	VALUE *ptr = RSTRUCT_PTR(rv);

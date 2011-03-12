@@ -31,7 +31,7 @@ struct raindrop {
 
 /* allow mmap-ed regions to store more than one raindrop */
 struct raindrops {
-	long size;
+	size_t size;
 	size_t capa;
 	pid_t pid;
 	struct raindrop *drops;
@@ -92,7 +92,7 @@ static VALUE init(VALUE self, VALUE size)
 	if (r->drops != MAP_FAILED)
 		rb_raise(rb_eRuntimeError, "already initialized");
 
-	r->size = NUM2LONG(size);
+	r->size = NUM2SIZET(size);
 	if (r->size < 1)
 		rb_raise(rb_eArgError, "size must be >= 1");
 
@@ -150,7 +150,7 @@ static void resize(struct raindrops *r, size_t new_rd_size)
 	r->drops = rv;
 	r->size = new_rd_size;
 	r->capa = new_size / raindrop_size;
-	assert(r->capa >= (size_t)r->size && "bad sizing");
+	assert(r->capa >= r->size && "bad sizing");
 }
 #else /* ! HAVE_MREMAP */
 /*
@@ -207,7 +207,7 @@ static VALUE init_copy(VALUE dest, VALUE source)
 	struct raindrops *dst = DATA_PTR(dest);
 	struct raindrops *src = get(source);
 
-	init(dest, LONG2NUM(src->size));
+	init(dest, SIZET2NUM(src->size));
 	memcpy(dst->drops, src->drops, raindrop_size * src->size);
 
 	return dest;
@@ -271,7 +271,7 @@ static VALUE to_ary(VALUE self)
 {
 	struct raindrops *r = get(self);
 	VALUE rv = rb_ary_new2(r->size);
-	long i;
+	size_t i;
 	unsigned long base = (unsigned long)r->drops;
 
 	for (i = 0; i < r->size; i++) {
@@ -292,7 +292,7 @@ static VALUE to_ary(VALUE self)
  */
 static VALUE size(VALUE self)
 {
-	return LONG2NUM(get(self)->size);
+	return SIZET2NUM(get(self)->size);
 }
 
 /*
