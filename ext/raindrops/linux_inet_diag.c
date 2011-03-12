@@ -373,17 +373,20 @@ out:
 static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 {
 	char *host_ptr;
+	char *check;
 	char *colon = NULL;
 	char *rbracket = NULL;
+	void *dst;
 	long host_len;
-	struct addrinfo hints;
-	struct addrinfo *res;
-	int rc;
+	int af, rc;
+	uint16_t *portdst;
+	unsigned long port;
 
 	Check_Type(addr, T_STRING);
 	host_ptr = StringValueCStr(addr);
 	host_len = RSTRING_LEN(addr);
 	if (*host_ptr == '[') { /* ipv6 address format (rfc2732) */
+		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)inet;
 		rbracket = memchr(host_ptr + 1, ']', host_len - 1);
 
 		if (rbracket == NULL)
@@ -395,28 +398,30 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 		colon = rbracket + 1;
 		host_ptr++;
 		*rbracket = 0;
+		inet->ss_family = af = AF_INET6;
+		dst = &in6->sin6_addr;
+		portdst = &in6->sin6_port;
 	} else { /* ipv4 */
+		struct sockaddr_in *in = (struct sockaddr_in *)inet;
 		colon = memchr(host_ptr, ':', host_len);
+		inet->ss_family = af = AF_INET;
+		dst = &in->sin_addr;
+		portdst = &in->sin_port;
 	}
 
 	if (!colon)
 		rb_raise(rb_eArgError, "port not found in: `%s'", host_ptr);
-
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-
+	port = strtoul(colon + 1, &check, 10);
 	*colon = 0;
-	rc = getaddrinfo(host_ptr, colon + 1, &hints, &res);
+	rc = inet_pton(af, host_ptr, dst);
 	*colon = ':';
 	if (rbracket) *rbracket = ']';
-	if (rc != 0)
-		rb_raise(rb_eArgError, "getaddrinfo(%s): %s",
-			 host_ptr, gai_strerror(rc));
-
-	memcpy(inet, res->ai_addr, res->ai_addrlen);
-	freeaddrinfo(res);
+	if (*check || ((uint16_t)port != port))
+		rb_raise(rb_eArgError, "invalid port: %s", colon + 1);
+	if (rc != 1)
+		rb_raise(rb_eArgError, "inet_pton failed for: `%s' with %d",
+		         host_ptr, rc);
+	*portdst = ntohs((uint16_t)port);
 }
 
 /* generates inet_diag bytecode to match all addrs */
