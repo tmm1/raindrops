@@ -62,6 +62,32 @@ class TestLinux < Test::Unit::TestCase
     assert_equal 1, stats[addr].active
   end
 
+  def test_tcp_reuse_sock
+    nlsock = Raindrops::InetDiagSocket.new
+    s = TCPServer.new(TEST_ADDR, 0)
+    port = s.addr[1]
+    addr = "#{TEST_ADDR}:#{port}"
+    addrs = [ addr ]
+    stats = tcp_listener_stats(addrs, nlsock)
+    assert_equal 1, stats.size
+    assert_equal 0, stats[addr].queued
+    assert_equal 0, stats[addr].active
+
+    c = TCPSocket.new(TEST_ADDR, port)
+    stats = tcp_listener_stats(addrs, nlsock)
+    assert_equal 1, stats.size
+    assert_equal 1, stats[addr].queued
+    assert_equal 0, stats[addr].active
+
+    sc = s.accept
+    stats = tcp_listener_stats(addrs, nlsock)
+    assert_equal 1, stats.size
+    assert_equal 0, stats[addr].queued
+    assert_equal 1, stats[addr].active
+    ensure
+      nlsock.close
+  end
+
   def test_tcp_multi
     s1 = TCPServer.new(TEST_ADDR, 0)
     s2 = TCPServer.new(TEST_ADDR, 0)

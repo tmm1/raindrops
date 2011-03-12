@@ -79,6 +79,7 @@ end
 combined = {}
 tcp = nil if tcp.empty?
 unix = nil if unix.empty?
+sock = Raindrops::InetDiagSocket.new if tcp
 
 len = 35 if len > 35
 fmt = "%20s % #{len}s % 10u % 10u\n"
@@ -89,7 +90,7 @@ begin
     combined.clear
     now = nil
   end
-  tcp and combined.merge! Raindrops::Linux.tcp_listener_stats(tcp)
+  tcp and combined.merge! Raindrops::Linux.tcp_listener_stats(tcp, sock)
   unix and combined.merge! Raindrops::Linux.unix_listener_stats(unix)
   combined.each do |addr,stats|
     active, queued = stats.active, stats.queued

@@ -4,6 +4,7 @@
 #else
 #  include <st.h>
 #endif
+#include "my_fileno.h"
 #ifdef __linux__
 
 /* Ruby 1.8.6+ macros (for compatibility with Ruby 1.9) */
@@ -48,7 +49,8 @@ rb_thread_blocking_region(
 
 static size_t page_size;
 static unsigned g_seq;
-static VALUE cListenStats;
+static VALUE cListenStats, cIDSock;
+static ID id_new;
 
 struct listen_stats {
 	uint32_t active;
@@ -64,7 +66,24 @@ struct nogvl_args {
 	st_table *table;
 	struct iovec iov[3]; /* last iov holds inet_diag bytecode */
 	struct listen_stats stats;
+	int fd;
 };
+
+/*
+ * call-seq:
+ *	Raindrops::InetDiagSocket.new	-> Socket
+ *
+ * Creates a new Socket object for the netlink inet_diag facility
+ */
+static VALUE ids_s_new(VALUE klass)
+{
+	VALUE argv[3];
+	argv[0] = INT2NUM(AF_NETLINK);
+	argv[1] = INT2NUM(SOCK_RAW);
+	argv[2] = INT2NUM(NETLINK_INET_DIAG);
+
+	return rb_call_super(3, argv);
+}
 
 /* creates a Ruby ListenStats Struct based on our internal listen_stats */
 static VALUE rb_listen_stats(struct listen_stats *stats)
@@ -231,7 +250,6 @@ static inline void r_acc(struct nogvl_args *args, struct inet_diag_msg *r)
 	 */
 }
 
-static const char err_socket[] = "socket";
 static const char err_sendmsg[] = "sendmsg";
 static const char err_recvmsg[] = "recvmsg";
 static const char err_nlmsg[] = "nlmsg";
@@ -300,15 +318,11 @@ static VALUE diag(void *ptr)
 	struct msghdr msg;
 	const char *err = NULL;
 	unsigned seq = ++g_seq;
-	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_INET_DIAG);
-
-	if (fd < 0)
-		return (VALUE)err_socket;
 
 	prep_diag_args(args, &nladdr, &rta, &req, &msg);
 	req.nlh.nlmsg_seq = seq;
 
-	if (sendmsg(fd, &msg, 0) < 0) {
+	if (sendmsg(args->fd, &msg, 0) < 0) {
 		err = err_sendmsg;
 		goto out;
 	}
@@ -321,7 +335,7 @@ static VALUE diag(void *ptr)
 		struct nlmsghdr *h = (struct nlmsghdr *)args->iov[0].iov_base;
 
 		prep_msghdr(&msg, args, &nladdr, 1);
-		readed = recvmsg(fd, &msg, 0);
+		readed = recvmsg(args->fd, &msg, 0);
 		if (readed < 0) {
 			if (errno == EINTR)
 				continue;
@@ -346,7 +360,6 @@ static VALUE diag(void *ptr)
 out:
 	{
 		int save_errno = errno;
-		close(fd);
 		if (err && args->table) {
 			st_foreach(args->table, st_free_data, 0);
 			st_free_table(args->table);
@@ -491,7 +504,7 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 
 /*
  * call-seq:
- *      Raindrops::Linux.tcp_listener_stats([addrs]) => hash
+ *      Raindrops::Linux.tcp_listener_stats([addrs[, sock]]) => hash
  *
  * If specified, +addr+ may be a string or array of strings representing
  * listen addresses to filter for. Returns a hash with given addresses as
@@ -500,6 +513,7 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
  *      addrs = %w(0.0.0.0:80 127.0.0.1:8080)
  *
  * If +addr+ is nil or not specified, all (IPv4) addresses are returned.
+ * If +sock+ is specified, it should be a Raindrops::InetDiagSock object.
  */
 static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 {
@@ -507,9 +521,9 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 	long i;
 	VALUE rv = rb_hash_new();
 	struct nogvl_args args;
-	VALUE addrs;
+	VALUE addrs, sock;
 
-	rb_scan_args(argc, argv, "01", &addrs);
+	rb_scan_args(argc, argv, "02", &addrs, &sock);
 
 	/*
 	 * allocating page_size instead of OP_LEN since we'll reuse the
@@ -519,6 +533,9 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 	args.iov[2].iov_len = OPLEN;
 	args.iov[2].iov_base = alloca(page_size);
 	args.table = NULL;
+	if (NIL_P(sock))
+		sock = rb_funcall(cIDSock, id_new, 0);
+	args.fd = my_fileno(sock);
 
 	switch (TYPE(addrs)) {
 	case T_STRING:
@@ -551,6 +568,9 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 
 	st_foreach(args.table, NIL_P(addrs) ? st_to_hash : st_AND_hash, rv);
 	st_free_table(args.table);
+
+	/* let GC deal with corner cases */
+	if (argc < 2) rb_io_close(sock);
 	return rv;
 }
 
@@ -558,6 +578,19 @@ void Init_raindrops_linux_inet_diag(void)
 {
 	VALUE cRaindrops = rb_const_get(rb_cObject, rb_intern("Raindrops"));
 	VALUE mLinux = rb_define_module_under(cRaindrops, "Linux");
+
+	rb_require("socket");
+	cIDSock = rb_const_get(rb_cObject, rb_intern("Socket"));
+	id_new = rb_intern("new");
+
+	/*
+	 * Document-class: Raindrops::InetDiag::Socket
+	 *
+	 * This is a subclass of +Socket+ specifically for talking
+	 * to the inet_diag facility of Netlink.
+	 */
+	cIDSock = rb_define_class_under(cRaindrops, "InetDiagSocket", cIDSock);
+	rb_define_singleton_method(cIDSock, "new", ids_s_new, 0);
 
 	cListenStats = rb_const_get(cRaindrops, rb_intern("ListenStats"));
 
