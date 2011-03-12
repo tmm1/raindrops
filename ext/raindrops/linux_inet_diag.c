@@ -83,6 +83,20 @@ static int st_free_data(st_data_t key, st_data_t value, st_data_t ignored)
 	return ST_DELETE;
 }
 
+static int st_to_hash(st_data_t key, st_data_t value, VALUE hash)
+{
+	struct listen_stats *stats = (struct listen_stats *)value;
+
+	if (stats->listener_p) {
+		VALUE k = rb_str_new2((const char *)key);
+		VALUE v = rb_listen_stats(stats);
+
+		OBJ_FREEZE(k);
+		rb_hash_aset(hash, k, v);
+	}
+	return st_free_data(key, value, 0);
+}
+
 static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 {
 	char *key, *port;
@@ -359,6 +373,24 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	freeaddrinfo(res);
 }
 
+/* generates inet_diag bytecode to match all addrs for a given family */
+static void gen_bytecode_all(struct iovec *iov, sa_family_t family)
+{
+	struct inet_diag_bc_op *op;
+	struct inet_diag_hostcond *cond;
+
+	/* iov_len was already set and base allocated in a parent function */
+	assert(iov->iov_len == OPLEN && iov->iov_base && "iov invalid");
+	op = iov->iov_base;
+	op->code = INET_DIAG_BC_S_COND;
+	op->yes = OPLEN;
+	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
+	cond = (struct inet_diag_hostcond *)(op + 1);
+	cond->family = family;
+	cond->port = -1;
+	cond->prefix_len = 0;
+}
+
 /* generates inet_diag bytecode to match a single addr */
 static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
 {
@@ -458,38 +490,6 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 		rb_hash_aset(rv, *ary, tcp_stats(&args, *ary));
 
 	return rv;
-}
-
-static int st_to_hash(st_data_t key, st_data_t value, VALUE hash)
-{
-	struct listen_stats *stats = (struct listen_stats *)value;
-
-	if (stats->listener_p) {
-		VALUE k = rb_str_new2((const char *)key);
-		VALUE v = rb_listen_stats(stats);
-
-		OBJ_FREEZE(k);
-		rb_hash_aset(hash, k, v);
-	}
-	return st_free_data(key, value, 0);
-}
-
-/* generates inet_diag bytecode to match all addrs for a given family */
-static void gen_bytecode_all(struct iovec *iov, sa_family_t family)
-{
-	struct inet_diag_bc_op *op;
-	struct inet_diag_hostcond *cond;
-
-	/* iov_len was already set and base allocated in a parent function */
-	assert(iov->iov_len == OPLEN && iov->iov_base && "iov invalid");
-	op = iov->iov_base;
-	op->code = INET_DIAG_BC_S_COND;
-	op->yes = OPLEN;
-	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
-	cond = (struct inet_diag_hostcond *)(op + 1);
-	cond->family = family;
-	cond->port = -1;
-	cond->prefix_len = 0;
 }
 
 static VALUE all_tcp_listener_stats(VALUE obj)
