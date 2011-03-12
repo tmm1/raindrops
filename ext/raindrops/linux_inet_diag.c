@@ -470,6 +470,18 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 	return rb_listen_stats(&args->stats);
 }
 
+/* this is slow with multiple addresses */
+static VALUE ipv6_fallback(struct nogvl_args *args, VALUE addrs)
+{
+	VALUE *ary = RARRAY_PTR(addrs);
+	long i;
+	VALUE rv = rb_hash_new();
+
+	for (i = RARRAY_LEN(addrs); --i >= 0; ary++)
+		rb_hash_aset(rv, *ary, tcp_stats(args, *ary));
+	return rv;
+}
+
 /*
  * call-seq:
  *      Raindrops::Linux.tcp_listener_stats([addrs]) => hash
@@ -479,6 +491,8 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
  * keys and ListenStats objects as the values or a hash of all addresses.
  *
  *      addrs = %w(0.0.0.0:80 127.0.0.1:8080)
+ *
+ * If +addr+ is nil or not specified, all (IPv4) addresses are returned.
  */
 static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 {
@@ -512,7 +526,10 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 		}
 		for (; --i >= 0; ary++) {
 			struct sockaddr_storage check;
+
 			parse_addr(&check, *ary);
+			if (check.ss_family == AF_INET6)
+				return ipv6_fallback(&args, addrs);
 			rb_hash_aset(rv, *ary, Qtrue);
 		}
 		/* fall through */
