@@ -317,6 +317,7 @@ static VALUE diag(void *ptr)
 
 	while (1) {
 		ssize_t readed;
+		size_t r;
 		struct nlmsghdr *h = (struct nlmsghdr *)args->iov[0].iov_base;
 
 		prep_msghdr(&msg, args, &nladdr, 1);
@@ -329,8 +330,8 @@ static VALUE diag(void *ptr)
 		}
 		if (readed == 0)
 			goto out;
-
-		for ( ; NLMSG_OK(h, readed); h = NLMSG_NEXT(h, readed)) {
+		r = (size_t)readed;
+		for ( ; NLMSG_OK(h, r); h = NLMSG_NEXT(h, r)) {
 			if (h->nlmsg_seq != seq)
 				continue;
 			if (h->nlmsg_type == NLMSG_DONE)
