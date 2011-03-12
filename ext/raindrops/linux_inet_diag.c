@@ -261,9 +261,6 @@ static void prep_diag_args(
 	struct diag_req *req,
 	struct msghdr *msg)
 {
-	struct inet_diag_bc_op *op = args->iov[2].iov_base;
-	struct inet_diag_hostcond *cond = (struct inet_diag_hostcond *)(op + 1);
-
 	memset(req, 0, sizeof(struct diag_req));
 	memset(nladdr, 0, sizeof(struct sockaddr_nl));
 
@@ -275,7 +272,6 @@ static void prep_diag_args(
 	req->nlh.nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
 	req->nlh.nlmsg_pid = getpid();
 	req->r.idiag_states = (1<<TCP_ESTABLISHED) | (1<<TCP_LISTEN);
-	req->r.idiag_family = cond->family;
 	rta->rta_type = INET_DIAG_REQ_BYTECODE;
 	rta->rta_len = RTA_LENGTH(args->iov[2].iov_len);
 
@@ -409,8 +405,8 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	freeaddrinfo(res);
 }
 
-/* generates inet_diag bytecode to match all addrs for a given family */
-static void gen_bytecode_all(struct iovec *iov, sa_family_t family)
+/* generates inet_diag bytecode to match all addrs */
+static void gen_bytecode_all(struct iovec *iov)
 {
 	struct inet_diag_bc_op *op;
 	struct inet_diag_hostcond *cond;
@@ -422,7 +418,7 @@ static void gen_bytecode_all(struct iovec *iov, sa_family_t family)
 	op->yes = OPLEN;
 	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
 	cond = (struct inet_diag_hostcond *)(op + 1);
-	cond->family = family;
+	cond->family = AF_UNSPEC;
 	cond->port = -1;
 	cond->prefix_len = 0;
 }
@@ -543,7 +539,7 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 		/* fall through */
 	case T_NIL:
 		args.table = st_init_strtable();
-		gen_bytecode_all(&args.iov[2], AF_INET);
+		gen_bytecode_all(&args.iov[2]);
 		break;
 	default:
 		rb_raise(rb_eArgError,
