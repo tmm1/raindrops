@@ -40,8 +40,8 @@ class TestLinux < Test::Unit::TestCase
   end
 
   def test_tcp
-    port = unused_port
-    s = TCPServer.new(TEST_ADDR, port)
+    s = TCPServer.new(TEST_ADDR, 0)
+    port = s.addr[1]
     addr = "#{TEST_ADDR}:#{port}"
     addrs = [ addr ]
     stats = tcp_listener_stats(addrs)
@@ -63,9 +63,9 @@ class TestLinux < Test::Unit::TestCase
   end
 
   def test_tcp_multi
-    port1, port2 = unused_port, unused_port
-    s1 = TCPServer.new(TEST_ADDR, port1)
-    s2 = TCPServer.new(TEST_ADDR, port2)
+    s1 = TCPServer.new(TEST_ADDR, 0)
+    s2 = TCPServer.new(TEST_ADDR, 0)
+    port1, port2 = s1.addr[1], s2.addr[1]
     addr1, addr2 = "#{TEST_ADDR}:#{port1}", "#{TEST_ADDR}:#{port2}"
     addrs = [ addr1, addr2 ]
     stats = tcp_listener_stats(addrs)
@@ -127,10 +127,10 @@ class TestLinux < Test::Unit::TestCase
   def test_tcp_stress_test
     nr_proc = 32
     nr_sock = 500
-    port = unused_port
+    s = TCPServer.new(TEST_ADDR, 0)
+    port = s.addr[1]
     addr = "#{TEST_ADDR}:#{port}"
     addrs = [ addr ]
-    s = TCPServer.new(TEST_ADDR, port)
     rda, wra = IO.pipe
     rdb, wrb = IO.pipe
 
@@ -177,52 +177,4 @@ class TestLinux < Test::Unit::TestCase
     statuses = Process.waitall
     statuses.each { |(pid,status)| assert status.success?, status.inspect }
   end if ENV["STRESS"].to_i != 0
-
-private
-
-  # Stolen from Unicorn, also a version of this is used by the Rainbows!
-  # test suite.
-  # unused_port provides an unused port on +addr+ usable for TCP that is
-  # guaranteed to be unused across all compatible tests on that system.  It
-  # prevents race conditions by using a lock file other tests
-  # will see.  This is required if you perform several builds in parallel
-  # with a continuous integration system or run tests in parallel via
-  # gmake.  This is NOT guaranteed to be race-free if you run other
-  # systems that bind to random ports for testing (but the window
-  # for a race condition is very small).  You may also set UNICORN_TEST_ADDR
-  # to override the default test address (127.0.0.1).
-  def unused_port(addr = TEST_ADDR)
-    retries = 100
-    base = 5000
-    port = sock = nil
-    begin
-      begin
-        port = base + rand(32768 - base)
-        while port == 8080
-          port = base + rand(32768 - base)
-        end
-
-        sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
-        sock.bind(Socket.pack_sockaddr_in(port, addr))
-        sock.listen(5)
-      rescue Errno::EADDRINUSE, Errno::EACCES
-        sock.close rescue nil
-        retry if (retries -= 1) >= 0
-      end
-
-      # since we'll end up closing the random port we just got, there's a race
-      # condition could allow the random port we just chose to reselect itself
-      # when running tests in parallel with gmake.  Create a lock file while
-      # we have the port here to ensure that does not happen .
-      lock_path = "#{Dir::tmpdir}/unicorn_test.#{addr}:#{port}.lock"
-      lock = File.open(lock_path, File::WRONLY|File::CREAT|File::EXCL, 0600)
-      at_exit { File.unlink(lock_path) rescue nil }
-    rescue Errno::EEXIST
-      sock.close rescue nil
-      retry
-    end
-    sock.close rescue nil
-    port
-  end
-
 end if RUBY_PLATFORM =~ /linux/
