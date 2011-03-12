@@ -11,7 +11,7 @@ class TestLinuxAllTcpListenStats < Test::Unit::TestCase
 
   def test_print_all
     puts "EVERYTHING"
-    pp Raindrops::Linux.all_tcp_listener_stats
+    pp Raindrops::Linux.tcp_listener_stats
     puts("-" * 72)
   end if $stdout.tty?
 
@@ -44,23 +44,23 @@ class TestLinuxAllTcpListenStats < Test::Unit::TestCase
   def test_all_ports
     srv, port = new_server
     addr = "#{TEST_ADDR}:#{port}"
-    all = Raindrops::Linux.all_tcp_listener_stats
+    all = Raindrops::Linux.tcp_listener_stats
     assert_equal [0,0], all[addr].to_a
 
     new_client(port)
-    all = Raindrops::Linux.all_tcp_listener_stats
+    all = Raindrops::Linux.tcp_listener_stats
     assert_equal [0,1], all[addr].to_a
 
     new_client(port)
-    all = Raindrops::Linux.all_tcp_listener_stats
+    all = Raindrops::Linux.tcp_listener_stats
     assert_equal [0,2], all[addr].to_a
 
     new_accept(srv)
-    all = Raindrops::Linux.all_tcp_listener_stats
+    all = Raindrops::Linux.tcp_listener_stats
     assert_equal [1,1], all[addr].to_a
 
     new_accept(srv)
-    all = Raindrops::Linux.all_tcp_listener_stats
+    all = Raindrops::Linux.tcp_listener_stats
     assert_equal [2,0], all[addr].to_a
   end
 end if RUBY_PLATFORM =~ /linux/

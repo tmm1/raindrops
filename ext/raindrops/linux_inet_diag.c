@@ -97,6 +97,22 @@ static int st_to_hash(st_data_t key, st_data_t value, VALUE hash)
 	return st_free_data(key, value, 0);
 }
 
+static int st_AND_hash(st_data_t key, st_data_t value, VALUE hash)
+{
+	struct listen_stats *stats = (struct listen_stats *)value;
+
+	if (stats->listener_p) {
+		VALUE k = rb_str_new2((const char *)key);
+
+		if (rb_hash_lookup(hash, k) == Qtrue) {
+			VALUE v = rb_listen_stats(stats);
+			OBJ_FREEZE(k);
+			rb_hash_aset(hash, k, v);
+		}
+	}
+	return st_free_data(key, value, 0);
+}
+
 static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 {
 	char *key, *port;
@@ -332,9 +348,7 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	struct addrinfo *res;
 	int rc;
 
-	if (TYPE(addr) != T_STRING)
-		rb_raise(rb_eArgError, "addrs must be an Array of Strings");
-
+	Check_Type(addr, T_STRING);
 	host_ptr = StringValueCStr(addr);
 	host_len = RSTRING_LEN(addr);
 	if (*host_ptr == '[') { /* ipv6 address format (rfc2732) */
@@ -458,19 +472,23 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 
 /*
  * call-seq:
- *      addrs = %w(0.0.0.0:80 127.0.0.1:8080)
- *      Raindrops::Linux.tcp_listener_stats(addrs) => hash
+ *      Raindrops::Linux.tcp_listener_stats([addrs]) => hash
  *
- * Takes an array of strings representing listen addresses to filter for.
- * Returns a hash with given addresses as keys and ListenStats
- * objects as the values.
+ * If specified, +addr+ may be a string or array of strings representing
+ * listen addresses to filter for. Returns a hash with given addresses as
+ * keys and ListenStats objects as the values or a hash of all addresses.
+ *
+ *      addrs = %w(0.0.0.0:80 127.0.0.1:8080)
  */
-static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
+static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 {
 	VALUE *ary;
 	long i;
-	VALUE rv;
+	VALUE rv = rb_hash_new();
 	struct nogvl_args args;
+	VALUE addrs;
+
+	rb_scan_args(argc, argv, "01", &addrs);
 
 	/*
 	 * allocating page_size instead of OP_LEN since we'll reuse the
@@ -481,35 +499,35 @@ static VALUE tcp_listener_stats(VALUE obj, VALUE addrs)
 	args.iov[2].iov_base = alloca(page_size);
 	args.table = NULL;
 
-	if (TYPE(addrs) != T_ARRAY)
-		rb_raise(rb_eArgError, "addrs must be an Array of Strings");
-
-	rv = rb_hash_new();
-	ary = RARRAY_PTR(addrs);
-	for (i = RARRAY_LEN(addrs); --i >= 0; ary++)
-		rb_hash_aset(rv, *ary, tcp_stats(&args, *ary));
-
-	return rv;
-}
-
-static VALUE all_tcp_listener_stats(VALUE obj)
-{
-	VALUE rv;
-	struct nogvl_args args;
-
-	/*
-	 * allocating page_size instead of OP_LEN since we'll reuse the
-	 * buffer for recvmsg() later, we already checked for
-	 * OPLEN <= page_size at initialization
-	 */
-	args.iov[2].iov_len = OPLEN;
-	args.iov[2].iov_base = alloca(page_size);
-	args.table = st_init_strtable();
-	gen_bytecode_all(&args.iov[2], AF_INET);
+	switch (TYPE(addrs)) {
+	case T_STRING:
+		rb_hash_aset(rv, addrs, tcp_stats(&args, addrs));
+		return rv;
+	case T_ARRAY:
+		ary = RARRAY_PTR(addrs);
+		i = RARRAY_LEN(addrs);
+		if (i == 1) {
+			rb_hash_aset(rv, *ary, tcp_stats(&args, *ary));
+			return rv;
+		}
+		for (; --i >= 0; ary++) {
+			struct sockaddr_storage check;
+			parse_addr(&check, *ary);
+			rb_hash_aset(rv, *ary, Qtrue);
+		}
+		/* fall through */
+	case T_NIL:
+		args.table = st_init_strtable();
+		gen_bytecode_all(&args.iov[2], AF_INET);
+		break;
+	default:
+		rb_raise(rb_eArgError,
+		         "addr must be an array of strings, a string, or nil");
+	}
 
 	nl_errcheck(rb_thread_blocking_region(diag, &args, NULL, 0));
-	rv = rb_hash_new();
-	st_foreach(args.table, st_to_hash, rv);
+
+	st_foreach(args.table, NIL_P(addrs) ? st_to_hash : st_AND_hash, rv);
 	st_free_table(args.table);
 	return rv;
 }
@@ -522,9 +540,7 @@ void Init_raindrops_linux_inet_diag(void)
 	cListenStats = rb_const_get(cRaindrops, rb_intern("ListenStats"));
 
 	rb_define_module_function(mLinux, "tcp_listener_stats",
-	                          tcp_listener_stats, 1);
-	rb_define_module_function(mLinux, "all_tcp_listener_stats",
-	                          all_tcp_listener_stats, 0);
+	                          tcp_listener_stats, -1);
 
 	page_size = getpagesize();
 
