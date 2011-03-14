@@ -34,15 +34,19 @@ module Raindrops::Linux
   # counterpart due to the latter being able to use inet_diag via netlink.
   # This parses /proc/net/unix as there is no other (known) way
   # to expose Unix domain socket statistics over netlink.
-  def unix_listener_stats(paths)
+  def unix_listener_stats(paths = nil)
     rv = Hash.new { |h,k| h[k.freeze] = Raindrops::ListenStats.new(0, 0) }
-    paths = paths.map do |path|
-      path = path.dup
-      path.force_encoding(Encoding::BINARY) if defined?(Encoding)
-      rv[path]
-      Regexp.escape(path)
+    if nil == paths
+      paths = [ '[^\n]+' ]
+    else
+      paths = paths.map do |path|
+        path = path.dup
+        path.force_encoding(Encoding::BINARY) if defined?(Encoding)
+        rv[path]
+        Regexp.escape(path)
+      end
     end
-    paths = / 00000000 \d+ (\d+)\s+\d+ (#{paths.join('|')})$/n
+    paths = /^\w+: \d+ \d+ 00000000 \d+ (\d+)\s+\d+ (#{paths.join('|')})$/n
 
     # no point in pread since we can't stat for size on this file
     File.read(*PROC_NET_UNIX_ARGS).scan(paths) do |s|

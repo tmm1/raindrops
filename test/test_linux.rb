@@ -39,6 +39,26 @@ class TestLinux < Test::Unit::TestCase
     assert_equal 1, stats[tmp.path].queued
   end
 
+  def test_unix_all
+    tmp = Tempfile.new("\xde\xad\xbe\xef") # valid path, really :)
+    File.unlink(tmp.path)
+    us = UNIXServer.new(tmp.path)
+    uc0 = UNIXSocket.new(tmp.path)
+    stats = unix_listener_stats
+    assert_equal 0, stats[tmp.path].active
+    assert_equal 1, stats[tmp.path].queued
+
+    uc1 = UNIXSocket.new(tmp.path)
+    stats = unix_listener_stats
+    assert_equal 0, stats[tmp.path].active
+    assert_equal 2, stats[tmp.path].queued
+
+    ua0 = us.accept
+    stats = unix_listener_stats
+    assert_equal 1, stats[tmp.path].active
+    assert_equal 1, stats[tmp.path].queued
+  end
+
   def test_tcp
     s = TCPServer.new(TEST_ADDR, 0)
     port = s.addr[1]
