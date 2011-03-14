@@ -8,6 +8,10 @@ require 'raindrops'
 require 'optparse'
 require 'ipaddr'
 require 'time'
+begin
+  require 'sleepy_penguin'
+rescue LoadError
+end
 usage = "Usage: #$0 [-d DELAY] [-t QUEUED_THRESHOLD] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
@@ -30,6 +34,16 @@ begin
 rescue LoadError
   $stderr.puts "Aggregate missing, USR1 and USR2 handlers unavailable"
 end if delay
+
+if delay && defined?(SleepyPenguin::TimerFD)
+  @tfd = SleepyPenguin::TimerFD.new
+  @tfd.settime nil, delay, delay
+  def delay_for(seconds)
+    @tfd.expirations
+  end
+else
+  alias delay_for sleep
+end
 
 agg_active = agg_queued = nil
 if delay && defined?(Aggregate)
@@ -109,4 +123,4 @@ begin
     next if queued < queued_thresh
     printf fmt, now ||= Time.now.utc.iso8601, addr, active, queued
   end
-end while delay && sleep(delay)
+end while delay && delay_for(delay)
