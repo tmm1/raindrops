@@ -50,8 +50,8 @@ module Raindrops::Linux
 
     # no point in pread since we can't stat for size on this file
     File.read(*PROC_NET_UNIX_ARGS).scan(paths) do |s|
-      path = s.last
-      case s.first.to_i
+      path = s[-1]
+      case s[0].to_i
       when 2 then rv[path].queued += 1
       when 3 then rv[path].active += 1
       end
