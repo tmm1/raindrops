@@ -4,3 +4,5 @@
 Rainbows! do
   use :ThreadSpawn
 end
+stderr_path "/var/log/rainbows/stderr.log"
+stdout_path "/var/log/rainbows/stdout.log"
