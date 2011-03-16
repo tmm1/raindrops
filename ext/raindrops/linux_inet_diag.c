@@ -589,7 +589,7 @@ void Init_raindrops_linux_inet_diag(void)
 	id_new = rb_intern("new");
 
 	/*
-	 * Document-class: Raindrops::InetDiag::Socket
+	 * Document-class: Raindrops::InetDiagSocket
 	 *
 	 * This is a subclass of +Socket+ specifically for talking
 	 * to the inet_diag facility of Netlink.
