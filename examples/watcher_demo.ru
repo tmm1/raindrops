@@ -4,4 +4,10 @@
 # zbatery -c zbatery.conf.ru watcher_demo.ru -E none
 require "raindrops"
 use Raindrops::Middleware
-run Raindrops::Watcher.new :listeners => %w(0.0.0.0:80 /tmp/.raindrops)
+listeners = %w(
+  0.0.0.0:9418
+  0.0.0.0:80
+  /tmp/.raindrops
+  /tmp/.r
+)
+run Raindrops::Watcher.new :listeners => listeners
