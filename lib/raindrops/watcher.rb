@@ -294,9 +294,7 @@ class Raindrops::Watcher
   end
 
   def tail(addr, env)
-    [ 200,
-      { "Transfer-Encoding" => "chunked", "Content-Type" => "text/plain" },
-      Tailer.new(self, addr, env) ]
+    Tailer.new(self, addr, env).finish
   end
   # :startdoc:
 
@@ -313,6 +311,18 @@ class Raindrops::Watcher
       len = Rack::Utils.bytesize(addr)
       len = 35 if len > 35
       @fmt = "%20s % #{len}s % 10u % 10u\n"
+      case env["HTTP_VERSION"]
+      when "HTTP/1.0", nil
+        @chunk = false
+      else
+        @chunk = true
+      end
+    end
+
+    def finish
+      headers = { "Content-Type" => "text/plain" }
+      headers["Transfer-Encoding"] = "chunked" if @chunk
+      [ 200, headers, self ]
     end
 
     # called by the Rack server
@@ -323,9 +333,10 @@ class Raindrops::Watcher
         stats.queued >= @queued_min or next
         stats.active >= @active_min or next
         body = sprintf(@fmt, time.iso8601, @addr, stats.active, stats.queued)
-        yield "#{body.size.to_s(16)}\r\n#{body}\r\n"
+        body = "#{body.size.to_s(16)}\r\n#{body}\r\n" if @chunk
+        yield body
       end while true
-      yield "0\r\n\r\n"
+      yield "0\r\n\r\n" if @chunk
     end
   end
 
