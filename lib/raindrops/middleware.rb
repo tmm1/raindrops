@@ -59,6 +59,16 @@ require 'raindrops'
 # * active - total number of active clients on that listener
 # * queued - total number of queued (pre-accept()) clients on that listener
 #
+# = Demo Server
+#
+# There is a server running this middleware (and Watcher) at
+#  http://raindrops-demo.bogomips.org/_raindrops
+#
+# Also check out the Watcher demo at http://raindrops-demo.bogomips.org/
+#
+# The demo server is only limited to 30 users, so be sure not to abuse it
+# by using the /tail/ endpoint too much.
+#
 class Raindrops::Middleware
   attr_accessor :app, :stats, :path, :tcp, :unix # :nodoc:
 

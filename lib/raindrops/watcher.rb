@@ -86,6 +86,14 @@ require "aggregate"
 # - X-Outliers-Low - number of low outliers (hopefully many!)
 # - X-Outliers-High - number of high outliers (hopefully zero!)
 #
+# = Demo Server
+#
+# There is a server running this app at http://raindrops-demo.bogomips.org/
+# The Raindrops::Middleware demo is also accessible at
+#   http://raindrops-demo.bogomips.org/_raindrops
+#
+# The demo server is only limited to 30 users, so be sure not to abuse it
+# by using the /tail/ endpoint too much.
 class Raindrops::Watcher
   # :stopdoc:
   attr_reader :snapshot
