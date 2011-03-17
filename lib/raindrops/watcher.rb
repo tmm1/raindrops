@@ -243,6 +243,11 @@ class Raindrops::Watcher
     else
       not_found
     end
+    rescue Errno::EDOM
+      raise if defined?(retried)
+      retried = true
+      wait_snapshot
+      retry
   end
 
   def not_found
