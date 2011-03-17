@@ -132,9 +132,28 @@ static int st_AND_hash(st_data_t key, st_data_t value, VALUE hash)
 	return st_free_data(key, value, 0);
 }
 
+static const char *addr_any(sa_family_t family)
+{
+	static const char ipv4[] = "0.0.0.0";
+	static const char ipv6[] = "[::]";
+
+	if (family == AF_INET)
+		return ipv4;
+	assert(family == AF_INET6 && "unknown family");
+	return ipv6;
+}
+
+static void bug_warn(void)
+{
+	fprintf(stderr, "Please report how you produced this at "\
+	                "raindrops@librelist.com\n");
+	fflush(stderr);
+}
+
 static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 {
-	char *key, *port;
+	char *key, *port, *old_key;
+	size_t alloca_len;
 	struct listen_stats *stats;
 	size_t keylen;
 	size_t portlen = sizeof("65535");
@@ -146,15 +165,16 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 	switch ((ss.ss_family = r->idiag_family)) {
 	case AF_INET: {
 		struct sockaddr_in *in = (struct sockaddr_in *)&ss;
+
 		in->sin_port = r->id.idiag_sport;
 		in->sin_addr.s_addr = r->id.idiag_src[0];
 		keylen = INET_ADDRSTRLEN;
-		key = alloca(keylen + 1 + portlen);
+		alloca_len = keylen + 1 + portlen;
+		key = alloca(alloca_len);
 		key[keylen] = 0; /* will be ':' later */
 		port = key + keylen + 1;
 		rc = getnameinfo((struct sockaddr *)&ss, len,
 				 key, keylen, port, portlen, flags);
-
 		break;
 		}
 	case AF_INET6: {
@@ -164,7 +184,8 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		       &r->id.idiag_src, sizeof(__be32[4]));
 		keylen = INET6_ADDRSTRLEN;
 		          /* [            ] */
-		key = alloca(1 + keylen + 1 + 1 + portlen);
+		alloca_len = 1 + keylen + 1 + 1 + portlen;
+		key = alloca(alloca_len);
 		*key = '[';
 		key[1 + keylen + 1] = 0; /* will be ':' later */
 		port = 1 + key + keylen + 1 + 1;
@@ -176,10 +197,8 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		assert(0 && "unsupported address family, could that be IPv7?!");
 	}
 	if (rc != 0) {
-		fprintf(stderr, "BUG: getnameinfo: %s\n"
-		        "Please report how you produced this at %s\n",
-		        gai_strerror(rc), "raindrops@librelist.com");
-		fflush(stderr);
+		fprintf(stderr, "BUG: getnameinfo: %s\n", gai_strerror(rc));
+		bug_warn();
 		*key = 0;
 	}
 
@@ -195,19 +214,41 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		key[keylen] = ']';
 		key[keylen + 1] = ':';
 		memmove(key + keylen + 2, port, portlen + 1);
+		keylen++;
 		break;
 	default:
 		assert(0 && "unsupported address family, could that be IPv7?!");
 	}
 
-	if (!st_lookup(table, (st_data_t)key, (st_data_t *)&stats)) {
-		char *old_key = key;
+	if (st_lookup(table, (st_data_t)key, (st_data_t *)&stats))
+		return stats;
 
+	old_key = key;
+
+	if (r->idiag_state == TCP_ESTABLISHED) {
+		int n = snprintf(key, alloca_len, "%s:%u",
+				 addr_any(ss.ss_family),
+				 ntohs(r->id.idiag_sport));
+		if (n <= 0) {
+			fprintf(stderr, "BUG: snprintf: %d\n", n);
+			bug_warn();
+		}
+		if (st_lookup(table, (st_data_t)key, (st_data_t *)&stats))
+			return stats;
+		if (n <= 0) {
+			key = xmalloc(1);
+			*key = '\0';
+		} else {
+			old_key = key;
+			key = xmalloc(n + 1);
+			memcpy(key, old_key, n + 1);
+		}
+	} else {
 		key = xmalloc(keylen + 1 + portlen + 1);
 		memcpy(key, old_key, keylen + 1 + portlen + 1);
-		stats = xcalloc(1, sizeof(struct listen_stats));
-		st_insert(table, (st_data_t)key, (st_data_t)stats);
 	}
+	stats = xcalloc(1, sizeof(struct listen_stats));
+	st_insert(table, (st_data_t)key, (st_data_t)stats);
 	return stats;
 }
 
