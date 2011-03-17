@@ -34,4 +34,5 @@ class TestRaindropsGc < Test::Unit::TestCase
     assert status.success?
     assert_equal [ 0, 2 ], tmp.to_ary
   end
-end if !defined?(RUBY_ENGINE) || RUBY_ENGINE == "ruby"
+end if !defined?(RUBY_ENGINE) || RUBY_ENGINE == "ruby" &&
+       ENV["STRESS"].to_i != 0
