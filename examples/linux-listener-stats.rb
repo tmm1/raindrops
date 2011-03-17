@@ -15,7 +15,7 @@ end
 usage = "Usage: #$0 [-d DELAY] [-t QUEUED_THRESHOLD] ADDR..."
 ARGV.size > 0 or abort usage
 delay = false
-all_tcp = true
+all = false
 queued_thresh = -1
 # "normal" exits when driven on the command-line
 trap(:INT) { exit 130 }
@@ -25,7 +25,7 @@ opts = OptionParser.new('', 24, '  ') do |opts|
   opts.banner = usage
   opts.on('-d', '--delay=DELAY', Float) { |n| delay = n }
   opts.on('-t', '--queued-threshold=INT', Integer) { |n| queued_thresh = n }
-  opts.on('-a', '--all-tcp') { all_tcp = true }
+  opts.on('-a', '--all') { all = true }
   opts.parse! ARGV
 end
 
@@ -93,14 +93,11 @@ ARGV.each do |addr|
   (addr =~ %r{\A/} ? unix : tcp) << addr
 end
 combined = {}
-if all_tcp
-  tcp = true
-  tcp_arg = nil
-else
-  tcp_arg = tcp
+tcp_args = unix_args = nil
+unless tcp.empty? && unix.empty?
+  tcp_args = tcp
+  unix_args = unix
 end
-
-unix = nil if unix.empty?
 sock = Raindrops::InetDiagSocket.new if tcp
 
 len = 35 if len > 35
@@ -112,8 +109,8 @@ begin
     combined.clear
     now = nil
   end
-  tcp and combined.merge! Raindrops::Linux.tcp_listener_stats(tcp_arg, sock)
-  unix and combined.merge! Raindrops::Linux.unix_listener_stats(unix)
+  combined.merge! Raindrops::Linux.tcp_listener_stats(tcp_args, sock)
+  combined.merge! Raindrops::Linux.unix_listener_stats(unix_args)
   combined.each do |addr,stats|
     active, queued = stats.active, stats.queued
     if agg_active
