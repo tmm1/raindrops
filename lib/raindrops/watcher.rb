@@ -99,6 +99,7 @@ class Raindrops::Watcher
   attr_reader :snapshot
   include Rack::Utils
   include Raindrops::Linux
+  DOC_URL = "http://raindrops.bogomips.org/Raindrops/Watcher.html"
 
   def initialize(opts = {})
     @tcp_listeners = @unix_listeners = nil
@@ -301,7 +302,13 @@ class Raindrops::Watcher
           "<td><form action='/reset/#{e_addr}' method='post'>" \
             "<input type='submit' name='x' value='x' /></form></td>" \
         "</tr>" \
-      end.join << "</table></body></html>"
+      end.join << "</table>" \
+      "<p>" \
+        "This is running the #{self.class}</a> service, see " \
+        "<a href='#{DOC_URL}'>#{DOC_URL}</a> " \
+        "for more information and options." \
+      "</p>" \
+      "</body></html>"
     headers["Content-Length"] = bytesize(body).to_s
     [ 200, headers, [ body ] ]
   end
