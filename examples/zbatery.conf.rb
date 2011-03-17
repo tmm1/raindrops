@@ -4,5 +4,10 @@
 Rainbows! do
   use :ThreadSpawn
 end
-stderr_path "/var/log/rainbows/stderr.log"
-stdout_path "/var/log/rainbows/stdout.log"
+log_dir = "/var/log/zbatery"
+if File.writable?(log_dir) && File.directory?(log_dir)
+  stderr_path "#{log_dir}/raindrops-demo.stderr.log"
+  stdout_path "#{log_dir}/raindrops-demo.stdout.log"
+  user "www-data", "www-data"
+  listen "/tmp/.raindrops"
+end
