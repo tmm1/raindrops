@@ -309,7 +309,6 @@ class Raindrops::Watcher
   def tail(addr, env)
     Tailer.new(self, addr, env).finish
   end
-  # :startdoc:
 
   # This is the response body returned for "/tail/$ADDRESS.txt".  This
   # must use a multi-threaded Rack server with streaming response support.
@@ -353,10 +352,11 @@ class Raindrops::Watcher
     end
   end
 
-  # shuts down the background thread
+  # shuts down the background thread, only for tests
   def shutdown
     @socket = nil
     @thr.join if @thr
     @thr = nil
   end
+  # :startdoc:
 end
