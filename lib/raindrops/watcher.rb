@@ -35,28 +35,28 @@ require "aggregate"
 # Returns a plain text summary + histogram with X-* HTTP headers for
 # active connections.
 #
-# e.g.: curl http://example.com/active/0.0.0.0%3A80.txt
+# e.g.: curl http://raindrops-demo.bogomips.org/active/0.0.0.0%3A80.txt
 #
 # === GET /active/$LISTENER.html
 #
 # Returns an HTML summary + histogram with X-* HTTP headers for
 # active connections.
 #
-# e.g.: curl http://example.com/active/0.0.0.0%3A80.html
+# e.g.: curl http://raindrops-demo.bogomips.org/active/0.0.0.0%3A80.html
 #
 # === GET /queued/$LISTENER.txt
 #
 # Returns a plain text summary + histogram with X-* HTTP headers for
 # queued connections.
 #
-# e.g.: curl http://example.com/queued/0.0.0.0%3A80.txt
+# e.g.: curl http://raindrops-demo.bogomips.org/queued/0.0.0.0%3A80.txt
 #
 # === GET /queued/$LISTENER.html
 #
 # Returns an HTML summary + histogram with X-* HTTP headers for
 # queued connections.
 #
-# e.g.: curl http://example.com/queued/0.0.0.0%3A80.html
+# e.g.: curl http://raindrops-demo.bogomips.org/queued/0.0.0.0%3A80.html
 #
 # === GET /tail/$LISTENER.txt?active_min=1&queued_min=1
 #
@@ -90,7 +90,7 @@ require "aggregate"
 #
 # There is a server running this app at http://raindrops-demo.bogomips.org/
 # The Raindrops::Middleware demo is also accessible at
-#   http://raindrops-demo.bogomips.org/_raindrops
+# http://raindrops-demo.bogomips.org/_raindrops
 #
 # The demo server is only limited to 30 users, so be sure not to abuse it
 # by using the /tail/ endpoint too much.
