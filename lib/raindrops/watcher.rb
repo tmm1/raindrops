@@ -339,7 +339,10 @@ class Raindrops::Watcher
     end
 
     def finish
-      headers = { "Content-Type" => "text/plain" }
+      headers = {
+        "Content-Type" => "text/plain",
+        "Cache-Control" => "no-transform",
+      }
       headers["Transfer-Encoding"] = "chunked" if @chunk
       [ 200, headers, self ]
     end
