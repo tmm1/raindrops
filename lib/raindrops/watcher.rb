@@ -299,11 +299,16 @@ class Raindrops::Watcher
       all.map do |addr,stats|
         e_addr = escape addr
         "<tr>" \
-          "<td><a href='/tail/#{e_addr}.txt'>#{escape_html addr}</a></td>" \
-          "<td><a href='/active/#{e_addr}.html'>#{stats.active}</a></td>" \
-          "<td><a href='/queued/#{e_addr}.html'>#{stats.queued}</a></td>" \
+          "<td><a href='/tail/#{e_addr}.txt' " \
+            "title='&quot;tail&quot; output in real time'" \
+            ">#{escape_html addr}</a></td>" \
+          "<td><a href='/active/#{e_addr}.html' " \
+            "title='show active connection stats'>#{stats.active}</a></td>" \
+          "<td><a href='/queued/#{e_addr}.html' " \
+            "title='show queued connection stats'>#{stats.queued}</a></td>" \
           "<td><form action='/reset/#{e_addr}' method='post'>" \
-            "<input type='submit' name='x' value='x' /></form></td>" \
+            "<input title='reset statistics' " \
+              "type='submit' name='x' value='x' /></form></td>" \
         "</tr>" \
       end.join << "</table>" \
       "<p>" \
