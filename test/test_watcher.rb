@@ -50,6 +50,20 @@ class TestWatcher < Test::Unit::TestCase
     check_headers(resp.headers)
   end
 
+  def test_queued_txt
+    resp = @req.get "/queued/#@addr.txt"
+    assert_equal 200, resp.status.to_i
+    assert_equal "text/plain", resp.headers["Content-Type"]
+    check_headers(resp.headers)
+  end
+
+  def test_queued_html
+    resp = @req.get "/queued/#@addr.html"
+    assert_equal 200, resp.status.to_i
+    assert_equal "text/html", resp.headers["Content-Type"]
+    check_headers(resp.headers)
+  end
+
   def test_reset
     resp = @req.post "/reset/#@addr"
     assert_equal 302, resp.status.to_i

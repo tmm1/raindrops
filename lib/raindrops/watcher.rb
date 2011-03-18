@@ -168,14 +168,14 @@ class Raindrops::Watcher
   def active_stats(addr) # :nodoc:
     @lock.synchronize do
       tmp = @active[addr] or return
-      [ @resets[addr], tmp.dup ]
+      [ @snapshot[0], @resets[addr], tmp.dup ]
     end
   end
 
   def queued_stats(addr) # :nodoc:
     @lock.synchronize do
       tmp = @queued[addr] or return
-      [ @resets[addr], tmp.dup ]
+      [ @snapshot[0], @resets[addr], tmp.dup ]
     end
   end
 
@@ -200,16 +200,17 @@ class Raindrops::Watcher
   end
 
   def histogram_txt(agg)
-    reset_at, agg = *agg
+    updated_at, reset_at, agg = *agg
     headers = agg_to_hash(reset_at, agg)
     body = agg.to_s
     headers["Content-Type"] = "text/plain"
+    headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
     [ 200, headers, [ body ] ]
   end
 
   def histogram_html(agg, addr)
-    reset_at, agg = *agg
+    updated_at, reset_at, agg = *agg
     headers = agg_to_hash(reset_at, agg)
     body = "<html>" \
       "<head><title>#{hostname} - #{escape_html addr}</title></head>" \
@@ -221,6 +222,7 @@ class Raindrops::Watcher
       "<input type='submit' name='x' value='reset' /></form>" \
       "</body>"
     headers["Content-Type"] = "text/html"
+    headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
     [ 200, headers, [ body ] ]
   end
@@ -286,6 +288,7 @@ class Raindrops::Watcher
     headers = {
       "Content-Type" => "text/html",
       "Last-Modified" => updated_at.httpdate,
+      "Expires" => (updated_at + @delay).httpdate,
     }
     body = "<html><head>" \
       "<title>#{hostname} - all interfaces</title>" \
@@ -342,6 +345,7 @@ class Raindrops::Watcher
       headers = {
         "Content-Type" => "text/plain",
         "Cache-Control" => "no-transform",
+        "Expires" => Time.at(0).httpdate,
       }
       headers["Transfer-Encoding"] = "chunked" if @chunk
       [ 200, headers, self ]
