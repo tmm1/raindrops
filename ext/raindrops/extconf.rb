@@ -10,6 +10,7 @@ $CPPFLAGS += " -D_BSD_SOURCE -D_XOPEN_SOURCE=600 "
 have_func("getpagesize", "unistd.h")
 have_func("rb_struct_alloc_noinit")
 have_func('rb_thread_blocking_region')
+have_func('rb_thread_io_blocking_region')
 
 checking_for "GCC 4+ atomic builtins" do
   src = <<SRC

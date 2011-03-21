@@ -32,6 +32,11 @@ rb_thread_blocking_region(
 }
 #endif /* ! HAVE_RB_THREAD_BLOCKING_REGION */
 
+#ifndef HAVE_RB_THREAD_IO_BLOCKING_REGION
+#  define rb_thread_io_blocking_region(fn,data,fd) \
+      rb_thread_blocking_region((fn),(data),RUBY_UBF_IO,0)
+#endif /* HAVE_RB_THREAD_IO_BLOCKING_REGION */
+
 #include <assert.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -543,7 +548,7 @@ static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 	gen_bytecode(&args->iov[2], &query_addr);
 
 	memset(&args->stats, 0, sizeof(struct listen_stats));
-	nl_errcheck(rb_thread_blocking_region(diag, args, 0, 0));
+	nl_errcheck(rb_thread_io_blocking_region(diag, args, args->fd));
 
 	return rb_listen_stats(&args->stats);
 }
@@ -610,7 +615,7 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 		         "addr must be an array of strings, a string, or nil");
 	}
 
-	nl_errcheck(rb_thread_blocking_region(diag, &args, NULL, 0));
+	nl_errcheck(rb_thread_io_blocking_region(diag, &args, args.fd));
 
 	st_foreach(args.table, NIL_P(addrs) ? st_to_hash : st_AND_hash, rv);
 	st_free_table(args.table);
