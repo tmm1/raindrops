@@ -15,6 +15,7 @@
 /* partial emulation of the 1.9 rb_thread_blocking_region under 1.8 */
 #ifndef HAVE_RB_THREAD_BLOCKING_REGION
 #  include <rubysig.h>
+#  define RUBY_UBF_IO ((rb_unblock_function_t *)-1)
 typedef void rb_unblock_function_t(void *);
 typedef VALUE rb_blocking_function_t(void *);
 static VALUE
