@@ -203,8 +203,7 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 	case AF_INET6: {
 		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)&ss;
 		in6->sin6_port = r->id.idiag_sport;
-		memcpy(&in6->sin6_addr.in6_u.u6_addr32,
-		       &r->id.idiag_src, sizeof(__be32[4]));
+		memcpy(&in6->sin6_addr, &r->id.idiag_src, sizeof(__be32[4]));
 		keylen = INET6_ADDRSTRLEN;
 		          /* [            ] */
 		alloca_len = 1 + keylen + 1 + 1 + portlen;
