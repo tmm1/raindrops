@@ -43,6 +43,7 @@ rb_thread_blocking_region(
 #include <sys/types.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
 #include <asm/types.h>
 #include <netinet/in.h>
@@ -74,6 +75,21 @@ struct nogvl_args {
 	int fd;
 };
 
+#ifdef SOCK_CLOEXEC
+#  define my_SOCK_RAW (SOCK_RAW|SOCK_CLOEXEC)
+#  define FORCE_CLOEXEC(v) (v)
+#else
+#  define my_SOCK_RAW SOCK_RAW
+static VALUE FORCE_CLOEXEC(VALUE io)
+{
+	int fd = my_fileno(io);
+	int flags = fcntl(fd, F_SETFD, FD_CLOEXEC);
+	if (flags == -1)
+		rb_sys_fail("fcntl(F_SETFD, FD_CLOEXEC)");
+	return io;
+}
+#endif
+
 /*
  * call-seq:
  *	Raindrops::InetDiagSocket.new	-> Socket
@@ -83,11 +99,12 @@ struct nogvl_args {
 static VALUE ids_s_new(VALUE klass)
 {
 	VALUE argv[3];
+
 	argv[0] = INT2NUM(AF_NETLINK);
-	argv[1] = INT2NUM(SOCK_RAW);
+	argv[1] = INT2NUM(my_SOCK_RAW);
 	argv[2] = INT2NUM(NETLINK_INET_DIAG);
 
-	return rb_call_super(3, argv);
+	return FORCE_CLOEXEC(rb_call_super(3, argv));
 }
 
 /* creates a Ruby ListenStats Struct based on our internal listen_stats */
