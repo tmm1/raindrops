@@ -262,7 +262,7 @@ class Raindrops::Watcher
     when %r{\A/reset/(.+)\z}
       reset!(env, unescape($1))
     else
-      Rack::Response.new(["Not Found"], 404).finish
+      not_found
     end
   end
 
