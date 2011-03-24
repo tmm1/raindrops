@@ -72,19 +72,19 @@ require "aggregate"
 # - active_min - do not stream a line until this active count is reached
 # - queued_min - do not stream a line until this queued count is reached
 #
-# == Response headers (mostly the same as Raindrops::LastDataRecv)
+# == Response headers (mostly the same names as Raindrops::LastDataRecv)
 #
-# - X-Count   - number of requests received
+# - X-Count   - number of samples polled
 # - X-Last-Reset - date since the last reset
 #
 # The following headers are only present if X-Count is greater than one.
 #
-# - X-Min     - lowest last_data_recv time recorded (in milliseconds)
-# - X-Max     - highest last_data_recv time recorded (in milliseconds)
-# - X-Mean    - mean last_data_recv time recorded (rounded, in milliseconds)
-# - X-Std-Dev - standard deviation of last_data_recv times
-# - X-Outliers-Low - number of low outliers (hopefully many!)
-# - X-Outliers-High - number of high outliers (hopefully zero!)
+# - X-Min     - lowest number of connections recorded
+# - X-Max     - highest number of connections recorded
+# - X-Mean    - mean number of connections recorded
+# - X-Std-Dev - standard deviation of connection count
+# - X-Outliers-Low - number of low outliers (hopefully many for queued)
+# - X-Outliers-High - number of high outliers (hopefully zero for queued)
 #
 # = Demo Server
 #
