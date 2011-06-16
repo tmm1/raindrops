@@ -49,7 +49,7 @@ class TestLinuxTCP_Info < Test::Unit::TestCase
     s = TCPServer.new(TEST_ADDR, 0)
     c = TCPSocket.new TEST_ADDR, s.addr[1]
     c.syswrite "."
-    sleep delay
+    sleep(delay * 1.2)
     a = s.accept
     i = Raindrops::TCP_Info.new(a)
     assert i.last_data_recv >= delay_ms, "#{i.last_data_recv} < #{delay_ms}"
