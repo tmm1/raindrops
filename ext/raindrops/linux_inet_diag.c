@@ -54,6 +54,13 @@ rb_thread_blocking_region(
 #include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
 
+union any_addr {
+	struct sockaddr_storage ss;
+	struct sockaddr sa;
+	struct sockaddr_in in;
+	struct sockaddr_in6 in6;
+};
+
 static size_t page_size;
 static unsigned g_seq;
 static VALUE cListenStats, cIDSock;
@@ -180,30 +187,27 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 	struct listen_stats *stats;
 	size_t keylen;
 	size_t portlen = sizeof("65535");
-	struct sockaddr_storage ss = { 0 };
+	union any_addr sa = { 0 };
 	socklen_t len = sizeof(struct sockaddr_storage);
 	int rc;
 	int flags = NI_NUMERICHOST | NI_NUMERICSERV;
 
-	switch ((ss.ss_family = r->idiag_family)) {
+	switch ((sa.ss.ss_family = r->idiag_family)) {
 	case AF_INET: {
-		struct sockaddr_in *in = (struct sockaddr_in *)&ss;
-
-		in->sin_port = r->id.idiag_sport;
-		in->sin_addr.s_addr = r->id.idiag_src[0];
+		sa.in.sin_port = r->id.idiag_sport;
+		sa.in.sin_addr.s_addr = r->id.idiag_src[0];
 		keylen = INET_ADDRSTRLEN;
 		alloca_len = keylen + 1 + portlen;
 		key = alloca(alloca_len);
 		key[keylen] = 0; /* will be ':' later */
 		port = key + keylen + 1;
-		rc = getnameinfo((struct sockaddr *)&ss, len,
+		rc = getnameinfo(&sa.sa, len,
 				 key, keylen, port, portlen, flags);
 		break;
 		}
 	case AF_INET6: {
-		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)&ss;
-		in6->sin6_port = r->id.idiag_sport;
-		memcpy(&in6->sin6_addr, &r->id.idiag_src, sizeof(__be32[4]));
+		sa.in6.sin6_port = r->id.idiag_sport;
+		memcpy(&sa.in6.sin6_addr, &r->id.idiag_src, sizeof(__be32[4]));
 		keylen = INET6_ADDRSTRLEN;
 		          /* [            ] */
 		alloca_len = 1 + keylen + 1 + 1 + portlen;
@@ -211,7 +215,7 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 		*key = '[';
 		key[1 + keylen + 1] = 0; /* will be ':' later */
 		port = 1 + key + keylen + 1 + 1;
-		rc = getnameinfo((struct sockaddr *)&ss, len,
+		rc = getnameinfo(&sa.sa, len,
 				 key + 1, keylen, port, portlen, flags);
 		break;
 		}
@@ -227,7 +231,7 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 	keylen = strlen(key);
 	portlen = strlen(port);
 
-	switch (ss.ss_family) {
+	switch (sa.ss.ss_family) {
 	case AF_INET:
 		key[keylen] = ':';
 		memmove(key + keylen + 1, port, portlen + 1);
@@ -249,7 +253,7 @@ static struct listen_stats *stats_for(st_table *table, struct inet_diag_msg *r)
 
 	if (r->idiag_state == TCP_ESTABLISHED) {
 		int n = snprintf(key, alloca_len, "%s:%u",
-				 addr_any(ss.ss_family),
+				 addr_any(sa.ss.ss_family),
 				 ntohs(r->id.idiag_sport));
 		if (n <= 0) {
 			fprintf(stderr, "BUG: snprintf: %d\n", n);
@@ -433,7 +437,7 @@ out:
 }
 
 /* populates sockaddr_storage struct by parsing +addr+ */
-static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
+static void parse_addr(union any_addr *inet, VALUE addr)
 {
 	char *host_ptr;
 	char *check;
@@ -449,7 +453,6 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 	host_ptr = StringValueCStr(addr);
 	host_len = RSTRING_LEN(addr);
 	if (*host_ptr == '[') { /* ipv6 address format (rfc2732) */
-		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)inet;
 		rbracket = memchr(host_ptr + 1, ']', host_len - 1);
 
 		if (rbracket == NULL)
@@ -461,15 +464,14 @@ static void parse_addr(struct sockaddr_storage *inet, VALUE addr)
 		colon = rbracket + 1;
 		host_ptr++;
 		*rbracket = 0;
-		inet->ss_family = af = AF_INET6;
-		dst = &in6->sin6_addr;
-		portdst = &in6->sin6_port;
+		inet->ss.ss_family = af = AF_INET6;
+		dst = &inet->in6.sin6_addr;
+		portdst = &inet->in6.sin6_port;
 	} else { /* ipv4 */
-		struct sockaddr_in *in = (struct sockaddr_in *)inet;
 		colon = memchr(host_ptr, ':', host_len);
-		inet->ss_family = af = AF_INET;
-		dst = &in->sin_addr;
-		portdst = &in->sin_port;
+		inet->ss.ss_family = af = AF_INET;
+		dst = &inet->in.sin_addr;
+		portdst = &inet->in.sin_port;
 	}
 
 	if (!colon)
@@ -506,7 +508,7 @@ static void gen_bytecode_all(struct iovec *iov)
 }
 
 /* generates inet_diag bytecode to match a single addr */
-static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
+static void gen_bytecode(struct iovec *iov, union any_addr *inet)
 {
 	struct inet_diag_bc_op *op;
 	struct inet_diag_hostcond *cond;
@@ -519,25 +521,22 @@ static void gen_bytecode(struct iovec *iov, struct sockaddr_storage *inet)
 	op->no = sizeof(struct inet_diag_bc_op) + OPLEN;
 
 	cond = (struct inet_diag_hostcond *)(op + 1);
-	cond->family = inet->ss_family;
-	switch (inet->ss_family) {
+	cond->family = inet->ss.ss_family;
+	switch (inet->ss.ss_family) {
 	case AF_INET: {
-		struct sockaddr_in *in = (struct sockaddr_in *)inet;
-
-		cond->port = ntohs(in->sin_port);
-		cond->prefix_len = in->sin_addr.s_addr == 0 ? 0 :
-				   sizeof(in->sin_addr.s_addr) * CHAR_BIT;
-		*cond->addr = in->sin_addr.s_addr;
+		cond->port = ntohs(inet->in.sin_port);
+		cond->prefix_len = inet->in.sin_addr.s_addr == 0 ? 0 :
+				   sizeof(inet->in.sin_addr.s_addr) * CHAR_BIT;
+		*cond->addr = inet->in.sin_addr.s_addr;
 		}
 		break;
 	case AF_INET6: {
-		struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)inet;
-
-		cond->port = ntohs(in6->sin6_port);
-		cond->prefix_len = memcmp(&in6addr_any, &in6->sin6_addr,
+		cond->port = ntohs(inet->in6.sin6_port);
+		cond->prefix_len = memcmp(&in6addr_any, &inet->in6.sin6_addr,
 				          sizeof(struct in6_addr)) == 0 ?
-				  0 : sizeof(in6->sin6_addr) * CHAR_BIT;
-		memcpy(&cond->addr, &in6->sin6_addr, sizeof(struct in6_addr));
+				  0 : sizeof(inet->in6.sin6_addr) * CHAR_BIT;
+		memcpy(&cond->addr, &inet->in6.sin6_addr,
+		       sizeof(struct in6_addr));
 		}
 		break;
 	default:
@@ -559,7 +558,7 @@ static void nl_errcheck(VALUE r)
 
 static VALUE tcp_stats(struct nogvl_args *args, VALUE addr)
 {
-	struct sockaddr_storage query_addr;
+	union any_addr query_addr;
 
 	parse_addr(&query_addr, addr);
 	gen_bytecode(&args->iov[2], &query_addr);
@@ -617,7 +616,7 @@ static VALUE tcp_listener_stats(int argc, VALUE *argv, VALUE self)
 			return rv;
 		}
 		for (; --i >= 0; ary++) {
-			struct sockaddr_storage check;
+			union any_addr check;
 
 			parse_addr(&check, *ary);
 			rb_hash_aset(rv, *ary, Qtrue);
