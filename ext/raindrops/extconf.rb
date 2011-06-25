@@ -7,7 +7,7 @@ have_func('munmap', 'sys/mman.h') or abort 'munmap() not found'
 $CPPFLAGS += " -D_GNU_SOURCE "
 have_func('mremap', 'sys/mman.h')
 
-$CPPFLAGS += " -D_BSD_SOURCE -D_XOPEN_SOURCE=600 "
+$CPPFLAGS += " -D_BSD_SOURCE "
 have_func("getpagesize", "unistd.h")
 have_func('rb_thread_blocking_region')
 have_func('rb_thread_io_blocking_region')
