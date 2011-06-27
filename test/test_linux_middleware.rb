@@ -11,12 +11,17 @@ class TestLinuxMiddleware < Test::Unit::TestCase
     @resp_headers = { 'Content-Type' => 'text/plain', 'Content-Length' => '0' }
     @response = [ 200, @resp_headers, [] ]
     @app = lambda { |env| @response }
+    @to_close = []
+  end
+
+  def teardown
+    @to_close.each { |io| io.close unless io.closed? }
   end
 
   def test_unix_listener
     tmp = Tempfile.new("")
     File.unlink(tmp.path)
-    us = UNIXServer.new(tmp.path)
+    @to_close << UNIXServer.new(tmp.path)
     app = Raindrops::Middleware.new(@app, :listeners => [tmp.path])
     linux_extra = "#{tmp.path} active: 0\n#{tmp.path} queued: 0\n"
     response = app.call("PATH_INFO" => "/_raindrops")
@@ -37,8 +42,8 @@ class TestLinuxMiddleware < Test::Unit::TestCase
   def test_unix_listener_queued
     tmp = Tempfile.new("")
     File.unlink(tmp.path)
-    us = UNIXServer.new(tmp.path)
-    uc = UNIXSocket.new(tmp.path)
+    @to_close << UNIXServer.new(tmp.path)
+    @to_close << UNIXSocket.new(tmp.path)
     app = Raindrops::Middleware.new(@app, :listeners => [tmp.path])
     linux_extra = "#{tmp.path} active: 0\n#{tmp.path} queued: 1\n"
     response = app.call("PATH_INFO" => "/_raindrops")

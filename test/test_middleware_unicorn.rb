@@ -24,7 +24,7 @@ class TestMiddlewareUnicorn < Test::Unit::TestCase
     s = TCPSocket.new @host, @port
     s.write "GET /_raindrops HTTP/1.0\r\n\r\n"
     resp = s.read
-    head, body = resp.split /\r\n\r\n/, 2
+    _, body = resp.split(/\r\n\r\n/, 2)
     assert_match %r{^#@addr_regexp active: 1$}, body
     assert_match %r{^#@addr_regexp queued: 0$}, body
   end

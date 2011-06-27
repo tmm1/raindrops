@@ -22,13 +22,13 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 0, stats[addr].queued
     assert_equal 0, stats[addr].active
 
-    c = TCPSocket.new(TEST_ADDR, port)
+    @to_close << TCPSocket.new(TEST_ADDR, port)
     stats = tcp_listener_stats(addrs)
     assert_equal 1, stats.size
     assert_equal 1, stats[addr].queued
     assert_equal 0, stats[addr].active
 
-    sc = s.accept
+    @to_close << s.accept
     stats = tcp_listener_stats(addrs)
     assert_equal 1, stats.size
     assert_equal 0, stats[addr].queued
@@ -48,7 +48,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 0, stats[addr2].queued
     assert_equal 0, stats[addr2].active
 
-    c1 = TCPSocket.new(TEST_ADDR, port1)
+    @to_close << TCPSocket.new(TEST_ADDR, port1)
     stats = tcp_listener_stats(addrs)
     assert_equal 2, stats.size
     assert_equal 1, stats[addr1].queued
@@ -64,7 +64,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 0, stats[addr2].queued
     assert_equal 0, stats[addr2].active
 
-    c2 = TCPSocket.new(TEST_ADDR, port2)
+    @to_close << TCPSocket.new(TEST_ADDR, port2)
     stats = tcp_listener_stats(addrs)
     assert_equal 2, stats.size
     assert_equal 0, stats[addr1].queued
@@ -72,7 +72,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 1, stats[addr2].queued
     assert_equal 0, stats[addr2].active
 
-    c3 = TCPSocket.new(TEST_ADDR, port2)
+    @to_close << TCPSocket.new(TEST_ADDR, port2)
     stats = tcp_listener_stats(addrs)
     assert_equal 2, stats.size
     assert_equal 0, stats[addr1].queued
@@ -80,7 +80,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     assert_equal 2, stats[addr2].queued
     assert_equal 0, stats[addr2].active
 
-    sc2 = s2.accept
+    @to_close << s2.accept
     stats = tcp_listener_stats(addrs)
     assert_equal 2, stats.size
     assert_equal 0, stats[addr1].queued
@@ -116,7 +116,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
       fork do
         rda.close
         wrb.close
-        socks = (1..nr_sock).map { s.accept }
+        @to_close.concat((1..nr_sock).map { s.accept })
         wra.syswrite('.')
         wra.close
         rdb.sysread(1) # wait for parent to nuke us
@@ -127,7 +127,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
       fork do
         rda.close
         wrb.close
-        socks = (1..nr_sock).map { TCPSocket.new(TEST_ADDR, port) }
+        @to_close.concat((1..nr_sock).map { TCPSocket.new(TEST_ADDR, port) })
         wra.syswrite('.')
         wra.close
         rdb.sysread(1) # wait for parent to nuke us
@@ -141,7 +141,7 @@ class TestLinuxIPv6 < Test::Unit::TestCase
     expect = { addr => Raindrops::ListenStats[nr_sock * nr_proc, 0] }
     assert_equal expect, stats
 
-    uno_mas = TCPSocket.new(TEST_ADDR, port)
+    @to_close << TCPSocket.new(TEST_ADDR, port)
     stats = tcp_listener_stats(addrs)
     expect = { addr => Raindrops::ListenStats[nr_sock * nr_proc, 1] }
     assert_equal expect, stats
@@ -153,6 +153,6 @@ class TestLinuxIPv6 < Test::Unit::TestCase
 
     wrb.syswrite('.' * (nr_proc * 2)) # broadcast a wakeup
     statuses = Process.waitall
-    statuses.each { |(pid,status)| assert status.success?, status.inspect }
+    statuses.each { |(_,status)| assert status.success?, status.inspect }
   end if ENV["STRESS"].to_i != 0
 end if RUBY_PLATFORM =~ /linux/ && ipv6_enabled?

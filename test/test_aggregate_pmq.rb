@@ -49,7 +49,7 @@ class TestAggregatePMQ < Test::Unit::TestCase
         pmq.flush
       }
     }
-    workers.each { |pid| assert Process.waitpid2(pid).last.success? }
+    workers.each { |wpid| assert Process.waitpid2(wpid).last.success? }
     pmq.stop_master_loop
     assert Process.waitpid2(pid).last.success?
     assert_equal 400, pmq.count

@@ -5,6 +5,5 @@ def ipv6_enabled?
   rescue => e
     warn "skipping IPv6 tests, host does not seem to be IPv6 enabled:"
     warn "  #{e.class}: #{e}"
-    return false
-    ipv6_enabled = false
+    false
 end

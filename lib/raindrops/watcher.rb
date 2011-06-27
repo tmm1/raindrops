@@ -228,6 +228,7 @@ class Raindrops::Watcher
   end
 
   def get(env)
+    retried = false
     case env["PATH_INFO"]
     when "/"
       index
@@ -247,7 +248,7 @@ class Raindrops::Watcher
       not_found
     end
     rescue Errno::EDOM
-      raise if defined?(retried)
+      raise if retried
       retried = true
       wait_snapshot
       retry

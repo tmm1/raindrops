@@ -21,7 +21,7 @@ queued_thresh = -1
 trap(:INT) { exit 130 }
 trap(:PIPE) { exit 0 }
 
-opts = OptionParser.new('', 24, '  ') do |opts|
+OptionParser.new('', 24, '  ') do |opts|
   opts.banner = usage
   opts.on('-d', '--delay=DELAY', Float) { |n| delay = n }
   opts.on('-t', '--queued-threshold=INT', Integer) { |n| queued_thresh = n }

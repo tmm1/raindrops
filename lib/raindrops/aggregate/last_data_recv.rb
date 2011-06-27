@@ -46,7 +46,8 @@ module Raindrops::Aggregate::LastDataRecv
   # for accuracy.
   def self.extended(obj)
     obj.raindrops_aggregate = default_aggregate
-    obj.setsockopt Socket::SOL_TCP, tcp_defer_accept = 9, seconds = 60
+    # obj.setsockopt Socket::SOL_TCP, tcp_defer_accept = 9, seconds = 60
+    obj.setsockopt Socket::SOL_TCP, 9, 60
   end
 
   # :stopdoc:

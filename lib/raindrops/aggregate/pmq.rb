@@ -229,11 +229,11 @@ class Raindrops::Aggregate::PMQ
   def outliers_high; aggregate.outliers_high; end
 
   # proxy for \Aggregate#to_s
-  def to_s(*args); aggregate.to_s *args; end
+  def to_s(*args); aggregate.to_s(*args); end
 
   # proxy for \Aggregate#each
-  def each; aggregate.each { |*args| yield *args }; end
+  def each; aggregate.each { |*args| yield(*args) }; end
 
   # proxy for \Aggregate#each_nonzero
-  def each_nonzero; aggregate.each_nonzero { |*args| yield *args }; end
+  def each_nonzero; aggregate.each_nonzero { |*args| yield(*args) }; end
 end
