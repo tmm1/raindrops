@@ -62,7 +62,7 @@ Unpack it, and run "ruby setup.rb"
 
 See Raindrops::Middleware and Raindrops::LastDataRecv documentation for
 use Rack servers.  The entire library is fully-documented and we are
-responsive on the mailing list (mailto:raindrops@librelist.com) if you
+responsive on the mailing list (mailto:raindrops@librelist.org) if you
 have any questions or comments.
 
 == Development
@@ -96,7 +96,7 @@ similar in spirit to the existing LGPL).
 == Contact
 
 All feedback (bug reports, user/development discussion, patches, pull
-requests) go to the mailing list: mailto:raindrops@librelist.com
+requests) go to the mailing list: mailto:raindrops@librelist.org
 
 The mailing list is mirrored to Gmane, all information about the
 group is here:
