@@ -6,7 +6,7 @@ require "net/http"
 $stderr.sync = $stdout.sync = true
 pmq = begin
   Raindrops::Aggregate::PMQ
-rescue => LoadError
+rescue LoadError => e
   warn "W: #{e} skipping test"
   false
 end
