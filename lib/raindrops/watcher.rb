@@ -58,6 +58,10 @@ require "aggregate"
 #
 # e.g.: curl http://raindrops-demo.bogomips.org/queued/0.0.0.0%3A80.html
 #
+# === POST /reset/$LISTENER
+#
+# Resets the active and queued statistics for the given listener.
+#
 # === GET /tail/$LISTENER.txt?active_min=1&queued_min=1
 #
 # Streams chunked a response to the client.
