@@ -117,4 +117,45 @@ class TestWatcher < Test::Unit::TestCase
     status, headers, body = @app.call(env)
     assert_equal "1", headers["X-Current"], headers.inspect
   end
+
+  def test_peaks
+    env = @req.class.env_for "/active/#@addr.txt"
+    status, headers, body = @app.call(env.dup)
+    start = headers["X-First-Peak-At"]
+    assert headers["X-First-Peak-At"], headers.inspect
+    assert headers["X-Last-Peak-At"], headers.inspect
+    assert_nothing_raised { Time.parse(headers["X-First-Peak-At"]) }
+    assert_nothing_raised { Time.parse(headers["X-Last-Peak-At"]) }
+    before = headers["X-Last-Peak-At"]
+
+    env = @req.class.env_for "/queued/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_nothing_raised { Time.parse(headers["X-First-Peak-At"]) }
+    assert_nothing_raised { Time.parse(headers["X-Last-Peak-At"]) }
+    assert_equal before, headers["X-Last-Peak-At"], "should not change"
+
+    sleep 2
+    env = @req.class.env_for "/active/#@addr.txt"
+    status, headers, body = @app.call(env.dup)
+    assert_equal before, headers["X-Last-Peak-At"], headers.inspect
+
+    @ios << @srv.accept
+    assert_raises(Errno::EAGAIN) { @srv.accept_nonblock }
+    sleep 0.1
+    status, headers, body = @app.call(env.dup)
+    assert headers["X-Last-Peak-At"], headers.inspect
+    assert_nothing_raised { Time.parse(headers["X-Last-Peak-At"]) }
+    assert before != headers["X-Last-Peak-At"]
+
+    queued_before = headers["X-Last-Peak-At"]
+
+    sleep 2
+
+    env = @req.class.env_for "/queued/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_equal "0", headers["X-Current"]
+    assert_nothing_raised { Time.parse(headers["X-Last-Peak-At"]) }
+    assert_equal queued_before, headers["X-Last-Peak-At"], "should not change"
+    assert_equal start, headers["X-First-Peak-At"]
+  end
 end if RUBY_PLATFORM =~ /linux/

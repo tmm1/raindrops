@@ -104,6 +104,7 @@ class Raindrops::Watcher
   include Rack::Utils
   include Raindrops::Linux
   DOC_URL = "http://raindrops.bogomips.org/Raindrops/Watcher.html"
+  Peak = Struct.new(:first, :last)
 
   def initialize(opts = {})
     @tcp_listeners = @unix_listeners = nil
@@ -121,6 +122,8 @@ class Raindrops::Watcher
     @active = Hash.new { |h,k| h[k] = agg_class.new }
     @queued = Hash.new { |h,k| h[k] = agg_class.new }
     @resets = Hash.new { |h,k| h[k] = start }
+    @peak_active = Hash.new { |h,k| h[k] = Peak.new(start, start) }
+    @peak_queued = Hash.new { |h,k| h[k] = Peak.new(start, start) }
     @snapshot = [ start, {} ]
     @delay = opts[:delay] || 1
     @lock = Mutex.new
@@ -146,6 +149,16 @@ class Raindrops::Watcher
     end
   end
 
+  def aggregate!(agg_hash, peak_hash, addr, number, now)
+    agg = agg_hash[addr]
+    if (max = agg.max) && number > 0 && number >= max
+      peak = peak_hash[addr]
+      peak.first = now if number > max
+      peak.last = now
+    end
+    agg << number
+  end
+
   def aggregator_thread(logger) # :nodoc:
     @socket = sock = Raindrops::InetDiagSocket.new
     thr = Thread.new do
@@ -153,11 +166,12 @@ class Raindrops::Watcher
         combined = tcp_listener_stats(@tcp_listeners, sock)
         combined.merge!(unix_listener_stats(@unix_listeners))
         @lock.synchronize do
+          now = Time.now.utc
           combined.each do |addr,stats|
-            @active[addr] << stats.active
-            @queued[addr] << stats.queued
+            aggregate!(@active, @peak_active, addr, stats.active, now)
+            aggregate!(@queued, @peak_queued, addr, stats.queued, now)
           end
-          @snapshot = [ Time.now.utc, combined ]
+          @snapshot = [ now, combined ]
           @cond.broadcast
         end
       rescue => e
@@ -171,17 +185,17 @@ class Raindrops::Watcher
 
   def active_stats(addr) # :nodoc:
     @lock.synchronize do
-      tmp = @active[addr] or return
+      tmp, peak = @active[addr], @peak_active[addr]
       time, combined = @snapshot
-      [ time, @resets[addr], tmp.dup, combined[addr].active ]
+      [ time, @resets[addr], tmp.dup, combined[addr].active, peak ]
     end
   end
 
   def queued_stats(addr) # :nodoc:
     @lock.synchronize do
-      tmp = @queued[addr] or return
+      tmp, peak = @queued[addr], @peak_queued[addr]
       time, combined = @snapshot
-      [ time, @resets[addr], tmp.dup, combined[addr].queued ]
+      [ time, @resets[addr], tmp.dup, combined[addr].queued, peak ]
     end
   end
 
@@ -192,7 +206,7 @@ class Raindrops::Watcher
     end
   end
 
-  def agg_to_hash(reset_at, agg)
+  def agg_to_hash(reset_at, agg, current, peak)
     {
       "X-Count" => agg.count.to_s,
       "X-Min" => agg.min.to_s,
@@ -202,14 +216,16 @@ class Raindrops::Watcher
       "X-Outliers-Low" => agg.outliers_low.to_s,
       "X-Outliers-High" => agg.outliers_high.to_s,
       "X-Last-Reset" => reset_at.httpdate,
+      "X-Current" => current.to_s,
+      "X-First-Peak-At" => peak.first.httpdate,
+      "X-Last-Peak-At" => peak.last.httpdate,
     }
   end
 
   def histogram_txt(agg)
-    updated_at, reset_at, agg, current = *agg
-    headers = agg_to_hash(reset_at, agg)
+    updated_at, reset_at, agg, current, peak = *agg
+    headers = agg_to_hash(reset_at, agg, current, peak)
     body = agg.to_s
-    headers["X-Current"] = current.to_s
     headers["Content-Type"] = "text/plain"
     headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
@@ -217,8 +233,8 @@ class Raindrops::Watcher
   end
 
   def histogram_html(agg, addr)
-    updated_at, reset_at, agg, current = *agg
-    headers = agg_to_hash(reset_at, agg)
+    updated_at, reset_at, agg, current, peak = *agg
+    headers = agg_to_hash(reset_at, agg, current, peak)
     body = "<html>" \
       "<head><title>#{hostname} - #{escape_html addr}</title></head>" \
       "<body><table>" <<
@@ -228,7 +244,6 @@ class Raindrops::Watcher
       "<form action='/reset/#{escape addr}' method='post'>" \
       "<input type='submit' name='x' value='reset' /></form>" \
       "</body>"
-    headers["X-Current"] = current.to_s
     headers["Content-Type"] = "text/html"
     headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
