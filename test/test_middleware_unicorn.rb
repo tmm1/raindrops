@@ -19,7 +19,7 @@ class TestMiddlewareUnicorn < Test::Unit::TestCase
       use Raindrops::Middleware
       run Rack::Lobster.new
     end
-    @srv = fork { Unicorn.run(@app, @opts) }
+    @srv = fork { Unicorn::HttpServer.new(@app, @opts).start.join }
 
     s = TCPSocket.new @host, @port
     s.write "GET /_raindrops HTTP/1.0\r\n\r\n"

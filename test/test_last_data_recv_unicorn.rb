@@ -40,7 +40,7 @@ class TestLastDataRecvUnicorn < Test::Unit::TestCase
       end.to_app!
       def app.arity; 0; end
       def app.call; eval self; end
-      Unicorn.run(app, @opts)
+      Unicorn::HttpServer.new(app, @opts).start.join
     }
     400.times { assert_kind_of Net::HTTPSuccess, get("/") }
     resp = get("/ldr")
