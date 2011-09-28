@@ -96,4 +96,25 @@ class TestWatcher < Test::Unit::TestCase
       break
     end
   end
+
+  def test_x_current_header
+    env = @req.class.env_for "/active/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_equal "0", headers["X-Current"], headers.inspect
+
+    env = @req.class.env_for "/queued/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_equal "1", headers["X-Current"], headers.inspect
+
+    @ios << @srv.accept
+    sleep 0.1
+
+    env = @req.class.env_for "/queued/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_equal "0", headers["X-Current"], headers.inspect
+
+    env = @req.class.env_for "/active/#@addr.txt"
+    status, headers, body = @app.call(env)
+    assert_equal "1", headers["X-Current"], headers.inspect
+  end
 end if RUBY_PLATFORM =~ /linux/

@@ -172,14 +172,16 @@ class Raindrops::Watcher
   def active_stats(addr) # :nodoc:
     @lock.synchronize do
       tmp = @active[addr] or return
-      [ @snapshot[0], @resets[addr], tmp.dup ]
+      time, combined = @snapshot
+      [ time, @resets[addr], tmp.dup, combined[addr].active ]
     end
   end
 
   def queued_stats(addr) # :nodoc:
     @lock.synchronize do
       tmp = @queued[addr] or return
-      [ @snapshot[0], @resets[addr], tmp.dup ]
+      time, combined = @snapshot
+      [ time, @resets[addr], tmp.dup, combined[addr].queued ]
     end
   end
 
@@ -204,9 +206,10 @@ class Raindrops::Watcher
   end
 
   def histogram_txt(agg)
-    updated_at, reset_at, agg = *agg
+    updated_at, reset_at, agg, current = *agg
     headers = agg_to_hash(reset_at, agg)
     body = agg.to_s
+    headers["X-Current"] = current.to_s
     headers["Content-Type"] = "text/plain"
     headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
@@ -214,7 +217,7 @@ class Raindrops::Watcher
   end
 
   def histogram_html(agg, addr)
-    updated_at, reset_at, agg = *agg
+    updated_at, reset_at, agg, current = *agg
     headers = agg_to_hash(reset_at, agg)
     body = "<html>" \
       "<head><title>#{hostname} - #{escape_html addr}</title></head>" \
@@ -225,6 +228,7 @@ class Raindrops::Watcher
       "<form action='/reset/#{escape addr}' method='post'>" \
       "<input type='submit' name='x' value='reset' /></form>" \
       "</body>"
+    headers["X-Current"] = current.to_s
     headers["Content-Type"] = "text/html"
     headers["Expires"] = (updated_at + @delay).httpdate
     headers["Content-Length"] = bytesize(body).to_s
