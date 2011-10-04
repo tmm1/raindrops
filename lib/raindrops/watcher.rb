@@ -89,6 +89,9 @@ require "aggregate"
 # - X-Std-Dev - standard deviation of connection count
 # - X-Outliers-Low - number of low outliers (hopefully many for queued)
 # - X-Outliers-High - number of high outliers (hopefully zero for queued)
+# - X-Current - current number of connections
+# - X-First-Peak-At - date of when X-Max was first reached
+# - X-Last-Peak-At - date of when X-Max was last reached
 #
 # = Demo Server
 #
