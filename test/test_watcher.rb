@@ -43,6 +43,20 @@ class TestWatcher < Test::Unit::TestCase
     check_headers(resp.headers)
   end
 
+  def test_invalid
+    assert_nothing_raised do
+      @req.get("/active/666.666.666.666%3A666.txt")
+      @req.get("/queued/666.666.666.666%3A666.txt")
+      @req.get("/active/666.666.666.666%3A666.html")
+      @req.get("/queued/666.666.666.666%3A666.html")
+    end
+    addr = @app.instance_eval do
+      @peak_active.keys + @peak_queued.keys +
+         @resets.keys + @active.keys + @queued.keys
+    end
+    assert addr.grep(/666\.666\.666\.666/).empty?, addr.inspect
+  end
+
   def test_active_html
     resp = @req.get "/active/#@addr.html"
     assert_equal 200, resp.status.to_i

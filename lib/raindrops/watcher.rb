@@ -120,14 +120,14 @@ class Raindrops::Watcher
       end
     end
 
-    agg_class = opts[:agg_class] || Aggregate
-    start = Time.now.utc
-    @active = Hash.new { |h,k| h[k] = agg_class.new }
-    @queued = Hash.new { |h,k| h[k] = agg_class.new }
-    @resets = Hash.new { |h,k| h[k] = start }
-    @peak_active = Hash.new { |h,k| h[k] = Peak.new(start, start) }
-    @peak_queued = Hash.new { |h,k| h[k] = Peak.new(start, start) }
-    @snapshot = [ start, {} ]
+    @agg_class = opts[:agg_class] || Aggregate
+    @start_time = Time.now.utc
+    @active = Hash.new { |h,k| h[k] = @agg_class.new }
+    @queued = Hash.new { |h,k| h[k] = @agg_class.new }
+    @resets = Hash.new { |h,k| h[k] = @start_time }
+    @peak_active = Hash.new { |h,k| h[k] = Peak.new(@start_time, @start_time) }
+    @peak_queued = Hash.new { |h,k| h[k] = Peak.new(@start_time, @start_time) }
+    @snapshot = [ @start_time, {} ]
     @delay = opts[:delay] || 1
     @lock = Mutex.new
     @start = Mutex.new
@@ -186,19 +186,25 @@ class Raindrops::Watcher
     thr
   end
 
+  def non_existent_stats(time)
+    [ time, @start_time, @agg_class.new, 0, Peak.new(@start_time, @start_time) ]
+  end
+
   def active_stats(addr) # :nodoc:
     @lock.synchronize do
-      tmp, peak = @active[addr], @peak_active[addr]
       time, combined = @snapshot
-      [ time, @resets[addr], tmp.dup, combined[addr].active, peak ]
+      stats = combined[addr] or return non_existent_stats(time)
+      tmp, peak = @active[addr], @peak_active[addr]
+      [ time, @resets[addr], tmp.dup, stats.active, peak ]
     end
   end
 
   def queued_stats(addr) # :nodoc:
     @lock.synchronize do
-      tmp, peak = @queued[addr], @peak_queued[addr]
       time, combined = @snapshot
-      [ time, @resets[addr], tmp.dup, combined[addr].queued, peak ]
+      stats = combined[addr] or return non_existent_stats(time)
+      tmp, peak = @queued[addr], @peak_queued[addr]
+      [ time, @resets[addr], tmp.dup, stats.queued, peak ]
     end
   end
 
