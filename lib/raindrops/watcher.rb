@@ -215,13 +215,19 @@ class Raindrops::Watcher
     end
   end
 
+  def std_dev(agg)
+    agg.std_dev.to_s
+  rescue Errno::EDOM
+    "NaN"
+  end
+
   def agg_to_hash(reset_at, agg, current, peak)
     {
       "X-Count" => agg.count.to_s,
       "X-Min" => agg.min.to_s,
       "X-Max" => agg.max.to_s,
       "X-Mean" => agg.mean.to_s,
-      "X-Std-Dev" => agg.std_dev.to_s,
+      "X-Std-Dev" => std_dev(agg),
       "X-Outliers-Low" => agg.outliers_low.to_s,
       "X-Outliers-High" => agg.outliers_high.to_s,
       "X-Last-Reset" => reset_at.httpdate,
@@ -261,29 +267,31 @@ class Raindrops::Watcher
 
   def get(env)
     retried = false
-    case env["PATH_INFO"]
-    when "/"
-      index
-    when %r{\A/active/(.+)\.txt\z}
-      histogram_txt(active_stats(unescape($1)))
-    when %r{\A/active/(.+)\.html\z}
-      addr = unescape $1
-      histogram_html(active_stats(addr), addr)
-    when %r{\A/queued/(.+)\.txt\z}
-      histogram_txt(queued_stats(unescape($1)))
-    when %r{\A/queued/(.+)\.html\z}
-      addr = unescape $1
-      histogram_html(queued_stats(addr), addr)
-    when %r{\A/tail/(.+)\.txt\z}
-      tail(unescape($1), env)
-    else
-      not_found
-    end
+    begin
+      case env["PATH_INFO"]
+      when "/"
+        index
+      when %r{\A/active/(.+)\.txt\z}
+        histogram_txt(active_stats(unescape($1)))
+      when %r{\A/active/(.+)\.html\z}
+        addr = unescape $1
+        histogram_html(active_stats(addr), addr)
+      when %r{\A/queued/(.+)\.txt\z}
+        histogram_txt(queued_stats(unescape($1)))
+      when %r{\A/queued/(.+)\.html\z}
+        addr = unescape $1
+        histogram_html(queued_stats(addr), addr)
+      when %r{\A/tail/(.+)\.txt\z}
+        tail(unescape($1), env)
+      else
+        not_found
+      end
     rescue Errno::EDOM
       raise if retried
       retried = true
       wait_snapshot
       retry
+    end
   end
 
   def not_found
