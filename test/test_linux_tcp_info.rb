@@ -58,4 +58,4 @@ class TestLinuxTCP_Info < Test::Unit::TestCase
       a.close if a
       s.close
   end
-end
+end if RUBY_PLATFORM =~ /linux/
