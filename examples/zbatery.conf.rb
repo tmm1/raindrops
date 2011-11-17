@@ -8,6 +8,6 @@ log_dir = "/var/log/zbatery"
 if File.writable?(log_dir) && File.directory?(log_dir)
   stderr_path "#{log_dir}/raindrops-demo.stderr.log"
   stdout_path "#{log_dir}/raindrops-demo.stdout.log"
-  listen "/tmp/.raindrops"
+  listen "/tmp/.r"
   pid "/tmp/.raindrops.pid"
 end
