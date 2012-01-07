@@ -130,7 +130,7 @@ class Raindrops::Middleware
     body = "calling: #{@stats.calling}\n" \
            "writing: #{@stats.writing}\n"
 
-    if defined?(Raindrops::Linux)
+    if defined?(Raindrops::Linux.tcp_listener_stats)
       Raindrops::Linux.tcp_listener_stats(@tcp).each do |addr,stats|
         body << "#{addr} active: #{stats.active}\n" \
                 "#{addr} queued: #{stats.queued}\n"
