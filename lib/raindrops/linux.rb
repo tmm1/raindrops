@@ -27,8 +27,8 @@ module Raindrops::Linux
   #             SS_CONNECTED,             /* connected to socket          */
   #             SS_DISCONNECTING          /* in process of disconnecting  */
   #     } socket_state;
-  # * SS_CONNECTING maps to ListenStats#active
-  # * SS_CONNECTED maps to ListenStats#queued
+  # * SS_CONNECTING maps to ListenStats#queued
+  # * SS_CONNECTED maps to ListenStats#active
   #
   # This method may be significantly slower than its tcp_listener_stats
   # counterpart due to the latter being able to use inet_diag via netlink.
